@@ -300,6 +300,7 @@ strong { font-weight: 500; color: var(--text); }
 .value-note { display: block; font-size: .68rem; letter-spacing: .18em; text-transform: uppercase; color: var(--silver); margin-top: 2px; }
 
 .add-btn {
+  display: inline-flex; align-items: center; justify-content: center; line-height: 1; text-align: center; flex: none;
   height: 42px; padding: 0 18px; border-radius: 999px; border: 1px solid rgba(255,255,255,.45);
   background: transparent; cursor: pointer; font-size: .68rem; letter-spacing: .22em; text-transform: uppercase;
   transition: all .3s var(--ease); white-space: nowrap;
