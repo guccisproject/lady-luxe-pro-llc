@@ -158,7 +158,6 @@
       '</div>' +
       '<div class="footer-bottom">' +
       '<span>Copyright &copy; ' + BUSINESS.name + ' 2026. All rights reserved.</span>' +
-      '<span class="pay-icons" aria-label="Accepted payment methods"><span>Visa</span><span>Mastercard</span><span>Amex</span><span>Apple Pay</span><span>Google Pay</span></span>' +
       '</div>' +
       '</div></div>';
     document.body.appendChild(footer);
