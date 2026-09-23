@@ -37,6 +37,7 @@
     diamond: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" aria-hidden="true"><path d="M6 3h12l4 6-10 12L2 9z"/><path d="M2 9h20M12 21 8 9l4-6 4 6z"/></svg>',
     spark: '<svg viewBox="0 0 12 12" fill="currentColor" aria-hidden="true"><path d="M6 0c.4 3.2 2.4 5.2 6 6-3.6.8-5.6 2.8-6 6-.4-3.2-2.4-5.2-6-6 3.6-.8 5.6-2.8 6-6z"/></svg>',
     bag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><path d="M5 8h14l-1 13H6z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>',
+    user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.2-4 4.3-6 8-6s6.8 2 8 6"/></svg>',
     lock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
     mail: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>',
     phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg>',
@@ -69,6 +70,64 @@
   }
   function storageSet(key, val) {
     try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { /* private mode */ }
+  }
+
+  function postJSON(url, body, method) {
+    return fetch(url, {
+      method: method || 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify(body || {})
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (b) {
+        if (!r.ok) {
+          var err = new Error(b.error || (r.status === 404 ? 'Accounts are not available right now.' : 'Something went wrong. Please try again.'));
+          err.status = r.status;
+          throw err;
+        }
+        return b;
+      });
+    });
+  }
+
+  function formData(form) {
+    var o = {};
+    new FormData(form).forEach(function (v, k) { o[k] = v; });
+    return o;
+  }
+
+  function setStatus(form, msg, ok) {
+    var el = $('.form-status', form);
+    if (!el) return;
+    el.className = 'form-status ' + (ok ? 'ok' : 'err');
+    el.textContent = msg || '';
+  }
+
+  // Only allow redirects to pages on this site
+  function safeNext(fallback) {
+    var n = new URLSearchParams(location.search).get('next') || '';
+    return /^[a-z0-9-]+\.html(\?[^#]*)?$/i.test(n) ? n : fallback;
+  }
+
+  // ---------------------------------------------------------------- auth state
+
+  var mePromise = null;
+  function getMe(refresh) {
+    if (!mePromise || refresh) {
+      mePromise = fetch('api/auth/me', { credentials: 'same-origin', cache: 'no-store' })
+        .then(function (r) { return r.ok ? r.json() : { user: null }; })
+        .then(function (b) { return b.user || null; })
+        .catch(function () { return null; });
+    }
+    return mePromise;
+  }
+
+  function updateAccountLink(user) {
+    $all('.account-link').forEach(function (a) {
+      a.href = user ? 'account.html' : 'login.html';
+      $('.account-label', a).textContent = user ? 'Account' : 'Sign in';
+      a.setAttribute('aria-label', user ? 'My account' : 'Sign in or create an account');
+    });
   }
 
   // ---------------------------------------------------------------- catalog
@@ -147,6 +206,8 @@
       }).join('') +
       '</nav>' +
       '<div class="header-actions">' +
+      '<a class="account-link" href="login.html"' + (page === 'account' || page === 'login' ? ' aria-current="page"' : '') + '>' + ICONS.user +
+      '<span class="account-label">Sign in</span></a>' +
       '<a class="cart-link" href="cart.html"' + (page === 'cart' ? ' aria-current="page"' : '') + '>' + ICONS.bag +
       '<span class="cart-label">Bag</span><span class="cart-count" data-count="0">0</span></a>' +
       '<button class="menu-toggle" type="button" aria-controls="site-nav" aria-expanded="false" aria-label="Open menu"><span></span></button>' +
@@ -184,6 +245,7 @@
       '<p style="margin-top:18px">Refined pieces for everyday life — thoughtfully chosen, beautifully packaged, and shipped with care from Titusville, Florida to your door.</p></div>' +
       '<div><h4>Explore</h4><ul>' +
       NAV.map(function (n) { return '<li><a href="' + n.href + '">' + n.label + '</a></li>'; }).join('') +
+      '<li><a href="account.html">My Account</a></li>' +
       '<li><a href="cart.html">Shopping Bag</a></li></ul></div>' +
       '<div><h4>Policies</h4><ul>' +
       POLICIES.map(function (p) { return '<li><a href="' + p.href + '">' + p.label + '</a></li>'; }).join('') +
@@ -344,7 +406,7 @@
       el.setAttribute('aria-live', 'polite');
       el.setAttribute('aria-label', 'Cookie consent');
       el.innerHTML =
-        '<p>We use essential cookies only &mdash; to keep items in your bag, enable secure checkout, and maintain site security and performance. ' +
+        '<p>We use essential cookies only &mdash; to keep items in your bag, enable secure checkout, keep you signed in, and maintain site security and performance. ' +
         'We do not use cookies for advertising, third-party tracking, or analytics. ' +
         '<a href="cookies.html">Read our Cookie Policy</a></p>' +
         '<div class="cookie-actions">' +
@@ -552,6 +614,7 @@
         '<p class="form-status" id="checkout-status" role="alert"></p>' +
         '<div class="pay-note">' + ICONS.lock + '<span>Payments are processed securely by Stripe. We never see or store your card details.</span></div>' +
         '<p style="font-size:.8rem;margin-top:16px" class="muted center">Express shipping and gift notes can be selected at checkout. By checking out you agree to our <a href="terms.html" style="border-bottom:1px solid var(--line)">Terms</a> and <a href="returns.html" style="border-bottom:1px solid var(--line)">Return Policy</a>.</p>' +
+        '<p class="muted center" id="cart-signin-note" style="font-size:.85rem;margin:14px 0 0" hidden><a href="login.html?next=cart.html" style="border-bottom:1px solid var(--line);color:var(--white)">Sign in</a> to save this order to your account.</p>' +
         '<a class="link-arrow" href="products.html" style="display:table;margin:18px auto 0">Continue shopping</a>' +
         '</aside></div>';
 
@@ -572,6 +635,7 @@
       });
 
       $('#checkout-btn', root).addEventListener('click', function () { startCheckout(items); });
+      getMe().then(function (u) { var n = $('#cart-signin-note', root); if (n && !u) n.hidden = false; });
     }
 
     function startCheckout(items) {
@@ -651,9 +715,108 @@
         if (!s) return;
         detail.innerHTML = (s.name ? 'Thank you, <strong>' + esc(s.name.split(' ')[0]) + '</strong>. ' : '') +
           (s.email ? 'A receipt is on its way to <strong>' + esc(s.email) + '</strong>. ' : '') +
-          (typeof s.amountTotal === 'number' ? 'Order total: <strong>' + moneyExact(s.amountTotal) + '</strong>.' : '');
+          (typeof s.amountTotal === 'number' ? 'Order total: <strong>' + moneyExact(s.amountTotal) + '</strong>. ' : '') +
+          (s.orderNumber ? 'Your order number is <strong>' + esc(s.orderNumber) + '</strong>.' : '');
       })
       .catch(function () { /* the generic message is fine */ });
+  }
+
+  function bindForm(form, handler) {
+    if (!form) return;
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      if (!form.checkValidity()) { form.reportValidity(); return; }
+      var btn = $('button[type="submit"]', form);
+      var label = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'Please wait…';
+      setStatus(form, '');
+      Promise.resolve().then(function () { return handler(formData(form)); })
+        .catch(function (err) { setStatus(form, err.message, false); })
+        .then(function () { btn.disabled = false; btn.textContent = label; });
+    });
+  }
+
+  function initLogin() {
+    var next = safeNext('account.html');
+    getMe().then(function (u) { if (u) location.replace(next); });
+    bindForm($('#login-form'), function (d) {
+      return postJSON('api/auth/login', d).then(function () { location.href = next; });
+    });
+    bindForm($('#register-form'), function (d) {
+      return postJSON('api/auth/register', d).then(function () { location.href = next; });
+    });
+  }
+
+  function formatDate(iso) {
+    try { return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }); } catch (e) { return iso; }
+  }
+
+  function initAccount() {
+    getMe().then(function (user) {
+      if (!user) { location.replace('login.html?next=account.html'); return; }
+      $('#account-greeting').textContent = 'Hello, ' + user.name.split(' ')[0];
+      $('#account-email').textContent = user.email + ' · Member since ' + formatDate(user.createdAt);
+      $('#pf-name').value = user.name;
+      $('#pf-email').value = user.email;
+      $('#pf-phone').value = user.phone || '';
+
+      fetch('api/account/orders', { credentials: 'same-origin', cache: 'no-store' })
+        .then(function (r) { return r.ok ? r.json() : { orders: [] }; })
+        .then(function (b) {
+          var root = $('#orders-root');
+          if (!b.orders.length) {
+            root.innerHTML = '<p>You haven’t placed an order with this account yet.</p><a class="btn btn-sm" href="products.html">Shop the collection</a>';
+            return;
+          }
+          root.innerHTML = b.orders.map(function (o) {
+            return '<div class="order"><div class="order-head"><div><b>' + esc(o.number) + '</b><span class="status-pill">' + esc(o.status) + '</span></div>' +
+              '<span class="order-meta">' + esc(formatDate(o.createdAt)) + (o.shipTo ? ' · Ships to ' + esc(o.shipTo.city) + ', ' + esc(o.shipTo.state) : '') + '</span></div>' +
+              '<ul class="order-items">' + (o.items || []).map(function (i) {
+                return '<li><span>' + esc(i.name) + ' &times; ' + i.quantity + '</span><span>' + moneyExact(i.amount) + '</span></li>';
+              }).join('') + '</ul>' +
+              '<div class="order-total"><span>Total</span><span>' + moneyExact(o.total) + '</span></div></div>';
+          }).join('') + '<p class="muted" style="font-size:.85rem;margin:16px 0 0">Questions about an order? <a href="contact.html" style="border-bottom:1px solid var(--line)">Contact us</a> with your order number.</p>';
+        });
+    });
+
+    $('#logout-btn').addEventListener('click', function () {
+      postJSON('api/auth/logout').catch(function () {}).then(function () { location.href = 'index.html'; });
+    });
+    bindForm($('#profile-form'), function (d) {
+      return postJSON('api/account', d, 'PATCH').then(function (b) {
+        $('#account-greeting').textContent = 'Hello, ' + b.user.name.split(' ')[0];
+        setStatus($('#profile-form'), 'Your details have been saved.', true);
+      });
+    });
+    bindForm($('#password-form'), function (d) {
+      return postJSON('api/account/password', d).then(function () {
+        $('#password-form').reset();
+        setStatus($('#password-form'), 'Your password has been updated. Other devices have been signed out.', true);
+      });
+    });
+    bindForm($('#delete-form'), function (d) {
+      if (!window.confirm('Delete your account permanently? This cannot be undone.')) return;
+      return postJSON('api/account/delete', d).then(function () { location.href = 'index.html'; });
+    });
+  }
+
+  function initReset() {
+    var token = new URLSearchParams(location.search).get('token');
+    if (token) {
+      $('#reset-request').hidden = true;
+      $('#reset-set').hidden = false;
+    }
+    bindForm($('#forgot-form'), function (d) {
+      return postJSON('api/auth/forgot', d).then(function (b) {
+        $('#forgot-form').reset();
+        setStatus($('#forgot-form'), b.message, true);
+      });
+    });
+    bindForm($('#reset-form'), function (d) {
+      d.token = token;
+      return postJSON('api/auth/reset', d).then(function () { location.href = 'account.html'; });
+    });
   }
 
   // ---------------------------------------------------------------- boot
@@ -671,6 +834,10 @@
     if (page === 'cart') initCart();
     if (page === 'contact') initContact();
     if (page === 'success') initSuccess();
+    if (page === 'login') initLogin();
+    if (page === 'account') initAccount();
+    if (page === 'reset') initReset();
+    getMe().then(updateAccountLink);
 
     setTimeout(function () { showCookieBanner(false); }, 900);
 

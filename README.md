@@ -13,6 +13,9 @@ It's a static site on a small Node/Express server that handles **Stripe Checkout
 | Contact (form + details) | `public/contact.html` |
 | Shopping bag / checkout | `public/cart.html` → Stripe Checkout |
 | Order confirmation | `public/success.html` |
+| Sign in / create account | `public/login.html` |
+| My Account (orders, details, password) | `public/account.html` |
+| Password reset | `public/reset-password.html` |
 | Shipping Policy | `public/shipping.html` |
 | Return Policy | `public/returns.html` |
 | Terms & Conditions | `public/terms.html` |
@@ -55,6 +58,16 @@ Until a key is set, the bag page tells customers to order by email or phone.
 
 If you set the `SMTP_*` values in `.env`, messages are emailed to `CONTACT_TO`.
 Otherwise they're saved on the server in `data/messages.jsonl`.
+
+## Customer accounts
+
+Customers can create an account, sign in and out, update their name and phone, change or reset their password, and delete their account. The **My Account** page shows the orders they placed while signed in.
+
+- Passwords are hashed with scrypt, so they are never stored as readable text. Sign-in uses a secure, HttpOnly session cookie (`lkl_session`) that lasts 30 days.
+- Sign-in, sign-up, and password reset are rate-limited.
+- Password reset emails are sent with the same SMTP settings as the contact form. If SMTP isn't set up, the reset link is printed in the server log instead, so set up SMTP before launch.
+- Account data is kept in `data/store.json` (or in `DATA_DIR` if you set it). **On hosts whose disk resets on each deploy, such as Render or Railway, attach a persistent disk and point `DATA_DIR` at it.** Otherwise accounts will be lost. Back this file up regularly.
+- Orders placed while signed in are linked to the account once payment succeeds. This happens on the confirmation page, and through the Stripe webhook if you set one up.
 
 ## Hosting
 

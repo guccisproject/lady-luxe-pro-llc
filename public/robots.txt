@@ -2,3 +2,6 @@ User-agent: *
 Disallow: /cart.html
 Disallow: /success.html
 Disallow: /api/
+Disallow: /account.html
+Disallow: /login.html
+Disallow: /reset-password.html
