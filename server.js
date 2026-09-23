@@ -5,13 +5,11 @@ require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const express = require('express');
-const { createStore } = require('./lib/store');
-const { createAccounts } = require('./lib/accounts');
 
 const PORT = process.env.PORT || 3000;
 const SITE_URL = (process.env.SITE_URL || `http://localhost:${PORT}`).replace(/\/+$/, '');
 const PUBLIC_DIR = path.join(__dirname, 'public');
-const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, 'data');
+const DATA_DIR = path.join(__dirname, 'data');
 
 // Shipping rules — keep in sync with public/shipping.html and public/js/main.js
 const FREE_SHIPPING_THRESHOLD = 7500; // cents
@@ -32,20 +30,6 @@ function loadCatalog() {
   return new Map(catalog.products.map((p) => [p.id, p]));
 }
 const catalog = loadCatalog();
-
-let mailer = null;
-if (process.env.SMTP_HOST) {
-  const nodemailer = require('nodemailer');
-  mailer = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT) || 587,
-    secure: Number(process.env.SMTP_PORT) === 465,
-    auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } : undefined,
-  });
-}
-
-const store = createStore(DATA_DIR);
-const accounts = createAccounts({ store, mailer, siteUrl: SITE_URL });
 
 const app = express();
 app.disable('x-powered-by');
@@ -72,15 +56,11 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), (req,
       amountTotal: s.amount_total,
       paymentStatus: s.payment_status,
     });
-    recordOrder(s.id).catch((err) => console.error('Order record error:', err.message));
   }
   res.json({ received: true });
 });
 
 app.use(express.json({ limit: '20kb' }));
-app.use(accounts.loadUser);
-app.use('/api', (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
-app.use('/api', accounts.router);
 
 app.get('/api/config', (req, res) => {
   res.json({ checkoutEnabled: Boolean(stripe) });
@@ -169,7 +149,6 @@ app.post('/api/create-checkout-session', async (req, res) => {
         },
       },
       allow_promotion_codes: true,
-      ...(req.user ? { customer_email: req.user.email, client_reference_id: req.user.id } : {}),
       success_url: `${SITE_URL}/success.html?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${SITE_URL}/cart.html`,
     });
@@ -186,15 +165,11 @@ app.get('/api/checkout-session', async (req, res) => {
   if (!/^cs_(test|live)_[A-Za-z0-9]+$/.test(id)) return res.status(400).json({ error: 'Invalid session.' });
   try {
     const s = await stripe.checkout.sessions.retrieve(id);
-    if (s.payment_status === 'paid' && !store.hasOrder(s.id)) {
-      await recordOrder(s.id).catch((err) => console.error('Order record error:', err.message));
-    }
     res.json({
       status: s.payment_status,
       email: s.customer_details && s.customer_details.email,
       name: s.customer_details && s.customer_details.name,
       amountTotal: s.amount_total,
-      orderNumber: 'LKL-' + s.id.slice(-8).toUpperCase(),
     });
   } catch (err) {
     res.status(404).json({ error: 'Order not found.' });
@@ -211,6 +186,17 @@ function rateLimited(ip) {
   hits.push(now);
   recentContacts.set(ip, hits);
   return hits.length > 5;
+}
+
+let mailer = null;
+if (process.env.SMTP_HOST) {
+  const nodemailer = require('nodemailer');
+  mailer = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT) || 587,
+    secure: Number(process.env.SMTP_PORT) === 465,
+    auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } : undefined,
+  });
 }
 
 app.post('/api/contact', async (req, res) => {
@@ -268,38 +254,6 @@ app.use(express.static(PUBLIC_DIR, { extensions: ['html'] }));
 app.use((req, res) => {
   res.status(404).sendFile(path.join(PUBLIC_DIR, '404.html'));
 });
-
-// Saves a paid Checkout Session as an order. Orders placed while signed in are
-// linked to the account (via client_reference_id) and appear in order history.
-async function recordOrder(sessionId) {
-  const s = await stripe.checkout.sessions.retrieve(sessionId, { expand: ['line_items'] });
-  if (s.payment_status !== 'paid') return;
-  const userId = s.client_reference_id && store.findUserById(s.client_reference_id) ? s.client_reference_id : null;
-  const shipping = (s.collected_information && s.collected_information.shipping_details) || s.shipping_details || null;
-  store.upsertOrder({
-    id: s.id,
-    number: 'LKL-' + s.id.slice(-8).toUpperCase(),
-    userId,
-    email: s.customer_details && s.customer_details.email,
-    createdAt: new Date(s.created * 1000).toISOString(),
-    status: 'Paid',
-    subtotal: s.amount_subtotal,
-    shipping: s.total_details ? s.total_details.amount_shipping : 0,
-    tax: s.total_details ? s.total_details.amount_tax : 0,
-    discount: s.total_details ? s.total_details.amount_discount : 0,
-    total: s.amount_total,
-    items: ((s.line_items && s.line_items.data) || []).map((li) => ({
-      name: li.description,
-      quantity: li.quantity,
-      amount: li.amount_total,
-    })),
-    shipTo: shipping && shipping.address ? {
-      name: shipping.name,
-      city: shipping.address.city,
-      state: shipping.address.state,
-    } : null,
-  });
-}
 
 function appendJsonLine(file, obj) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
