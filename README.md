@@ -1,0 +1,64 @@
+# Lady Katt Luxe — Website
+
+Storefront for **Lady Katt Luxe LLC** (Titusville, FL · Business ID 1556312).
+It's a static site on a small Node/Express server that handles **Stripe Checkout** and the **contact form**.
+
+## Pages
+
+| Page | File |
+| --- | --- |
+| Home | `public/index.html` |
+| Shop (all products, category filters, quick view) | `public/products.html` |
+| About Us | `public/about.html` |
+| Contact (form + details) | `public/contact.html` |
+| Shopping bag / checkout | `public/cart.html` → Stripe Checkout |
+| Order confirmation | `public/success.html` |
+| Shipping Policy | `public/shipping.html` |
+| Returns & Refunds | `public/returns.html` |
+| Terms & Conditions | `public/terms.html` |
+| Privacy & Cookie Policy | `public/privacy.html` |
+| Legal Notice | `public/legal.html` |
+
+The header, footer, cookie banner, and sparkle background are added to every page by `public/js/main.js`. Styles are in `public/css/styles.css`.
+
+## Products & prices
+
+All products live in **`public/data/products.json`**. Prices are in **cents** (`5800` = $58.00).
+To add or edit a product, change that file. For gift sets, `compareAt` is the "value" price (the individual items added together).
+The server reads prices from this file, so customers can't change prices in their browser.
+
+Product photos come from Unsplash (`"image": "photo-…"`). When you have your own product photos, put them in `public/img/`. Then update the image code in `main.js`/`server.js`, or ask for help switching to local images.
+
+## Running it
+
+```bash
+npm install
+cp .env.example .env     # then fill in your keys
+npm start                # http://localhost:3000
+```
+
+Requires Node 18+.
+
+## Connecting Stripe
+
+1. Create or sign in to a Stripe account at <https://dashboard.stripe.com>.
+2. Copy your **Secret key** (`sk_test_…` for testing, `sk_live_…` when you launch) into `.env` as `STRIPE_SECRET_KEY`.
+3. Set `SITE_URL` to your live domain (for example `https://ladykattluxe.shop`).
+4. Optional: add a webhook endpoint in Stripe pointing to `https://YOUR-DOMAIN/api/stripe-webhook` for the `checkout.session.completed` event. Put its signing secret in `STRIPE_WEBHOOK_SECRET`. Paid orders are then also logged to `data/orders.jsonl`.
+
+Checkout collects the U.S. shipping address and phone number, offers Standard ($6.95, free over $75) or Express ($14.95), and accepts promo codes and an optional gift note.
+You can test with card `4242 4242 4242 4242`, any future date, and any CVC.
+Until a key is set, the bag page tells customers to order by email or phone.
+
+## Contact form
+
+If you set the `SMTP_*` values in `.env`, messages are emailed to `CONTACT_TO`.
+Otherwise they're saved on the server in `data/messages.jsonl`.
+
+## Hosting
+
+This site needs a host that runs Node, such as Render, Railway, Fly.io, Heroku, or a VPS. Set the same environment variables there that you use in `.env`.
+
+## Policies
+
+The policy pages are professionally written starting drafts. **Replace them with your own policy documents, and have them reviewed by a qualified attorney.**

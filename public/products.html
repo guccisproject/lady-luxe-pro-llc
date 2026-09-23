@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shop | Lady Katt Luxe</title>
+<meta name="description" content="Shop the Lady Katt Luxe collection: jewelry, beauty, fashion, home, lifestyle essentials and curated gift sets.">
+<meta name="theme-color" content="#070708">
+<meta property="og:site_name" content="Lady Katt Luxe">
+<meta property="og:title" content="Shop | Lady Katt Luxe">
+<meta property="og:description" content="Shop the Lady Katt Luxe collection: jewelry, beauty, fashion, home, lifestyle essentials and curated gift sets.">
+<meta property="og:type" content="website">
+<link rel="icon" href="img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://images.unsplash.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+<script src="js/main.js" defer></script>
+</head>
+<body data-page="products">
+<main id="main">
+<section class="wrap section-tight">
+  <div class="glass page-hero reveal">
+    <span class="eyebrow">Shop</span>
+    <h1 id="shop-title">The Collection</h1>
+    <p class="lead">Jewelry, beauty, fashion, home, and lifestyle pieces &mdash; each one hand-selected. Select any piece to see the details.</p>
+  </div>
+</section>
+
+<section class="wrap section-tight">
+  <div class="glass shop-toolbar">
+    <div class="filters" id="filters" role="group" aria-label="Filter by category"></div>
+    <div style="display:flex;align-items:center;gap:14px">
+      <span class="muted" id="product-count" style="font-size:.8rem;letter-spacing:.1em" aria-live="polite"></span>
+      <label for="sort" class="sr-only">Sort products</label>
+      <select class="select" id="sort">
+        <option value="featured">Featured</option>
+        <option value="price-asc">Price: low to high</option>
+        <option value="price-desc">Price: high to low</option>
+        <option value="name">Name: A&ndash;Z</option>
+      </select>
+    </div>
+  </div>
+  <div class="grid grid-3" id="product-grid"></div>
+</section>
+</main>
+<noscript><div class="wrap"><p class="glass glass-pad center" style="margin-top:24px">Please enable JavaScript to use your shopping bag and checkout. You can also order by emailing <a href="mailto:contact@ladykattluxe.shop">contact@ladykattluxe.shop</a> or calling 904-663-2417.</p></div></noscript>
+</body>
+</html>

@@ -1,0 +1,4 @@
+User-agent: *
+Disallow: /cart.html
+Disallow: /success.html
+Disallow: /api/
