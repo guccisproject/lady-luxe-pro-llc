@@ -1,65 +1,78 @@
 # Lady Katt Luxe — Website
 
 Storefront for **Lady Katt Luxe LLC** (Titusville, FL · Business ID 1556312).
-It's a static site on a small Node/Express server that handles **Stripe Checkout** and the **contact form**.
+It's a fully static site built for **GitHub Pages**, with no server to run.
+Checkout uses **Stripe Payment Links** and the contact form uses **Formspree**.
 
 ## Pages
 
 | Page | File |
 | --- | --- |
-| Home | `public/index.html` |
-| Shop (all products, category filters, quick view) | `public/products.html` |
-| About Us | `public/about.html` |
-| Contact (form + details) | `public/contact.html` |
-| Shopping bag / checkout | `public/cart.html` → Stripe Checkout |
-| Order confirmation | `public/success.html` |
-| Shipping Policy | `public/shipping.html` |
-| Return Policy | `public/returns.html` |
-| Terms & Conditions | `public/terms.html` |
-| Privacy Policy | `public/privacy.html` |
-| Cookie Policy | `public/cookies.html` |
-| Legal Notice | `public/legal.html` |
+| Home | `index.html` |
+| Shop (category filters, product details) | `products.html` |
+| About Us | `about.html` |
+| Contact | `contact.html` |
+| Order confirmation (Stripe redirects here) | `success.html` |
+| Shipping Policy | `shipping.html` |
+| Return Policy | `returns.html` |
+| Terms & Conditions | `terms.html` |
+| Privacy Policy | `privacy.html` |
+| Cookie Policy | `cookies.html` |
+| Legal Notice | `legal.html` |
 
-The header, footer, cookie banner, and sparkle background are added to every page by `public/js/main.js`. Styles are in `public/css/styles.css`.
+`js/main.js` adds the header, footer, cookie banner, and sparkle background to every page. Styles are in `css/styles.css`.
 
-## Products & prices
+## 1. Publish on GitHub Pages
 
-All products live in **`public/data/products.json`**. Prices are in **cents** (`5800` = $58.00).
-To add or edit a product, change that file. For gift sets, `compareAt` is the "value" price (the individual items added together).
-The server reads prices from this file, so customers can't change prices in their browser.
+1. Merge this branch into `main`.
+2. In the repository, go to **Settings → Pages**. Set **Source** to *Deploy from a branch*, choose **`main`** and **`/ (root)`**, and save.
+3. Under **Custom domain**, enter `ladykattluxe.shop` and save. The `CNAME` file in this repo already contains it. Once DNS is working (step 2), tick **Enforce HTTPS**.
 
-Product photos come from Unsplash (`"image": "photo-…"`). When you have your own product photos, put them in `public/img/`. Then update the image code in `main.js`/`server.js`, or ask for help switching to local images.
+GitHub Pages is only free for public repositories unless you have a paid GitHub plan.
 
-## Running it
+## 2. Point the Porkbun domain at GitHub
 
-```bash
-npm install
-cp .env.example .env     # then fill in your keys
-npm start                # http://localhost:3000
-```
+In Porkbun, go to **Domain Management → ladykattluxe.shop → DNS**. Delete the default parking records for the main domain and `www` (the ALIAS, `*` CNAME, and A records), then add:
 
-Requires Node 18+.
+| Type | Host | Answer |
+| --- | --- | --- |
+| A | *(blank)* | `185.199.108.153` |
+| A | *(blank)* | `185.199.109.153` |
+| A | *(blank)* | `185.199.110.153` |
+| A | *(blank)* | `185.199.111.153` |
+| CNAME | `www` | `guccisproject.github.io` |
 
-## Connecting Stripe
+Don't touch any **MX** or **TXT** records used for email. DNS changes can take up to a few hours to spread.
 
-1. Create or sign in to a Stripe account at <https://dashboard.stripe.com>.
-2. Copy your **Secret key** (`sk_test_…` for testing, `sk_live_…` when you launch) into `.env` as `STRIPE_SECRET_KEY`.
-3. Set `SITE_URL` to your live domain (for example `https://ladykattluxe.shop`).
-4. Optional: add a webhook endpoint in Stripe pointing to `https://YOUR-DOMAIN/api/stripe-webhook` for the `checkout.session.completed` event. Put its signing secret in `STRIPE_WEBHOOK_SECRET`. Paid orders are then also logged to `data/orders.jsonl`.
+## 3. Connect Stripe checkout (Payment Links)
 
-Checkout collects the U.S. shipping address and phone number, offers Standard ($6.95, free over $75) or Express ($14.95), and accepts promo codes and an optional gift note.
-You can test with card `4242 4242 4242 4242`, any future date, and any CVC.
-Until a key is set, the bag page tells customers to order by email or phone.
+Each product has its own Stripe Payment Link. Until a product has one, its button reads **Inquire to order** and opens the contact form with the product already filled in.
 
-## Contact form
+For each product in `data/products.json`:
 
-If you set the `SMTP_*` values in `.env`, messages are emailed to `CONTACT_TO`.
-Otherwise they're saved on the server in `data/messages.jsonl`.
+1. In the Stripe Dashboard, go to **Payment Links → New**. Add a product with the same **name and price** as the site.
+2. Under options:
+   - Turn on **Let customers adjust quantity**.
+   - Turn on **Collect customers' addresses → Shipping addresses** (United States).
+   - Add your **shipping rates**.
+   - Optionally add a **custom field** labeled "Gift note."
+3. Under **After payment**, choose *Don't show confirmation page* and redirect to `https://ladykattluxe.shop/success.html`.
+4. Copy the link (`https://buy.stripe.com/…`) into that product's `"paymentLink"` field in `data/products.json`.
 
-## Hosting
+For gift sets, `compareAt` is the "value" price (the individual items added together). Prices are in **cents** (`5800` = $58.00). **The price in Stripe is what customers are charged**, so keep it matching the site.
 
-This site needs a host that runs Node, such as Render, Railway, Fly.io, Heroku, or a VPS. Set the same environment variables there that you use in `.env`.
+## 4. Connect the contact form (Formspree)
+
+1. Create a free account at <https://formspree.io> with contact@ladykattluxe.shop and create a new form.
+2. Copy the form ID. It's the part after `/f/` in the form's URL, for example `xyzabcde`.
+3. In `js/main.js`, set `var FORMSPREE_FORM_ID = 'xyzabcde';`.
+
+Until then, the form opens the visitor's email app with their message ready to send to contact@ladykattluxe.shop.
+
+## Previewing locally
+
+Open `index.html` through any static server, for example `python3 -m http.server`, then visit <http://localhost:8000>.
 
 ## Policies
 
-The Shipping, Return, Privacy, Cookie, Terms and Legal Notice pages use the owner's policy documents (last updated August 1, 2026), with contact details set to contact@ladykattluxe.shop and 904-663-2417. The cookie banner matches the Cookie Policy (essential cookies only).
+The policy pages use the owner's documents (last updated August 1, 2026). Contact details are set to contact@ladykattluxe.shop and 904-663-2417. The Cookie Policy was updated on September 23, 2026, because the site has no accounts or shopping cart. The cookie banner matches it: essential cookies only.

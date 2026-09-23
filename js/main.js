@@ -12,10 +12,10 @@
     businessId: '1556312'
   };
 
-  // Keep in sync with server.js
-  var FREE_SHIPPING_THRESHOLD = 7500;
-  var STANDARD_SHIPPING = 695;
-  var MAX_QTY = 10;
+  // Contact form delivery via Formspree (https://formspree.io). Create a form
+  // for contact@ladykattluxe.shop and paste its ID here, e.g. 'xyzabcde'.
+  // Until this is set, the contact form opens the visitor's email app instead.
+  var FORMSPREE_FORM_ID = '';
 
   var NAV = [
     { href: 'index.html', label: 'Home', page: 'home' },
@@ -58,7 +58,6 @@
   function money(cents) {
     return '$' + (cents / 100).toFixed(cents % 100 === 0 ? 0 : 2);
   }
-  function moneyExact(cents) { return '$' + (cents / 100).toFixed(2); }
 
   function imgUrl(photo, w, h) {
     return 'https://images.unsplash.com/' + photo + '?auto=format&fit=crop&w=' + w + (h ? '&h=' + h : '') + '&q=75';
@@ -89,42 +88,6 @@
     return catalogPromise;
   }
 
-  // ---------------------------------------------------------------- cart
-
-  var CART_KEY = 'lkl_cart_v1';
-  var Cart = {
-    items: function () {
-      var raw = storageGet(CART_KEY, []);
-      return Array.isArray(raw) ? raw.filter(function (i) { return i && i.id && i.qty > 0; }) : [];
-    },
-    save: function (items) { storageSet(CART_KEY, items); updateCartCount(true); document.dispatchEvent(new CustomEvent('cart:change')); },
-    count: function () { return Cart.items().reduce(function (n, i) { return n + i.qty; }, 0); },
-    add: function (id, qty) {
-      var items = Cart.items();
-      var found = items.filter(function (i) { return i.id === id; })[0];
-      if (found) found.qty = Math.min(MAX_QTY, found.qty + (qty || 1));
-      else items.push({ id: id, qty: Math.min(MAX_QTY, qty || 1) });
-      Cart.save(items);
-    },
-    setQty: function (id, qty) {
-      var items = Cart.items().map(function (i) { if (i.id === id) i.qty = Math.max(0, Math.min(MAX_QTY, qty)); return i; })
-        .filter(function (i) { return i.qty > 0; });
-      Cart.save(items);
-    },
-    remove: function (id) { Cart.save(Cart.items().filter(function (i) { return i.id !== id; })); },
-    clear: function () { Cart.save([]); }
-  };
-
-  function updateCartCount(bump) {
-    var n = Cart.count();
-    $all('.cart-count').forEach(function (el) {
-      el.textContent = n;
-      el.setAttribute('data-count', n);
-      if (bump) { el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
-    });
-    $all('.cart-link').forEach(function (el) { el.setAttribute('aria-label', 'Shopping bag, ' + n + (n === 1 ? ' item' : ' items')); });
-  }
-
   // ---------------------------------------------------------------- chrome
 
   function brandHtml() {
@@ -147,8 +110,6 @@
       }).join('') +
       '</nav>' +
       '<div class="header-actions">' +
-      '<a class="cart-link" href="cart.html"' + (page === 'cart' ? ' aria-current="page"' : '') + '>' + ICONS.bag +
-      '<span class="cart-label">Bag</span><span class="cart-count" data-count="0">0</span></a>' +
       '<button class="menu-toggle" type="button" aria-controls="site-nav" aria-expanded="false" aria-label="Open menu"><span></span></button>' +
       '</div></div>';
     document.body.insertBefore(header, document.body.firstChild);
@@ -184,7 +145,7 @@
       '<p style="margin-top:18px">Refined pieces for everyday life — thoughtfully chosen, beautifully packaged, and shipped with care from Titusville, Florida to your door.</p></div>' +
       '<div><h4>Explore</h4><ul>' +
       NAV.map(function (n) { return '<li><a href="' + n.href + '">' + n.label + '</a></li>'; }).join('') +
-      '<li><a href="cart.html">Shopping Bag</a></li></ul></div>' +
+      '</ul></div>' +
       '<div><h4>Policies</h4><ul>' +
       POLICIES.map(function (p) { return '<li><a href="' + p.href + '">' + p.label + '</a></li>'; }).join('') +
       '<li><a href="#" data-cookie-settings>Cookie Settings</a></li></ul></div>' +
@@ -313,24 +274,6 @@
     els.forEach(function (e) { io.observe(e); });
   }
 
-  // ---------------------------------------------------------------- toast
-
-  var toastTimer;
-  function toast(html) {
-    var t = $('.toast');
-    if (!t) {
-      t = document.createElement('div');
-      t.className = 'toast';
-      t.setAttribute('role', 'status');
-      t.setAttribute('aria-live', 'polite');
-      document.body.appendChild(t);
-    }
-    t.innerHTML = html;
-    t.classList.add('show');
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { t.classList.remove('show'); }, 3200);
-  }
-
   // ---------------------------------------------------------------- cookie banner
 
   var CONSENT_KEY = 'lkl_cookie_consent';
@@ -344,7 +287,7 @@
       el.setAttribute('aria-live', 'polite');
       el.setAttribute('aria-label', 'Cookie consent');
       el.innerHTML =
-        '<p>We use essential cookies only &mdash; to keep items in your bag, enable secure checkout, and maintain site security and performance. ' +
+        '<p>We use essential cookies only &mdash; to remember your cookie preference, enable secure checkout, and maintain site security and performance. ' +
         'We do not use cookies for advertising, third-party tracking, or analytics. ' +
         '<a href="cookies.html">Read our Cookie Policy</a></p>' +
         '<div class="cookie-actions">' +
@@ -376,24 +319,21 @@
       '<h3 class="product-title">' + esc(p.name) + '</h3>' +
       '<p class="product-desc">' + esc(p.description) + '</p>' +
       '<div class="product-foot"><div class="price">' + money(p.price) + save + '</div>' +
-      '<button class="add-btn" type="button" data-add="' + esc(p.id) + '">Add to bag</button></div>' +
+      buyButton(p, 'add-btn') + '</div>' +
       '</div></article>';
+  }
+
+  // Checkout happens on Stripe through a Payment Link for each product. Products
+  // without a link yet fall back to an order inquiry on the contact page.
+  function buyButton(p, cls) {
+    if (p.paymentLink) {
+      return '<a class="' + cls + '" href="' + esc(p.paymentLink) + '" rel="noopener">Buy now</a>';
+    }
+    return '<a class="' + cls + '" href="contact.html?product=' + encodeURIComponent(p.id) + '">Inquire to order</a>';
   }
 
   function bindProductActions(root, data) {
     root.addEventListener('click', function (e) {
-      var add = e.target.closest('[data-add]');
-      if (add) {
-        var id = add.getAttribute('data-add');
-        var p = data.byId[id];
-        if (!p) return;
-        Cart.add(id, 1);
-        add.classList.add('added');
-        add.textContent = 'Added';
-        setTimeout(function () { add.classList.remove('added'); add.textContent = 'Add to bag'; }, 1600);
-        toast(esc(p.name) + ' added to your bag <a href="cart.html">View bag</a>');
-        return;
-      }
       var qv = e.target.closest('[data-quickview]');
       if (qv) openQuickView(data.byId[qv.getAttribute('data-quickview')], data);
     });
@@ -408,7 +348,7 @@
       document.body.appendChild(dlg);
       dlg.addEventListener('click', function (e) { if (e.target === dlg) dlg.close(); });
     }
-    if (typeof dlg.showModal !== 'function') { Cart.add(p.id, 1); toast(esc(p.name) + ' added to your bag'); return; }
+    if (typeof dlg.showModal !== 'function') { location.href = p.paymentLink || ('contact.html?product=' + encodeURIComponent(p.id)); return; }
     var includes = p.includes ? '<div class="qv-includes"><h4>Inside the set</h4><ul>' +
       p.includes.map(function (i) { return '<li>' + esc(i) + '</li>'; }).join('') + '</ul></div>' : '';
     var utm = '?utm_source=lady_katt_luxe&utm_medium=referral';
@@ -423,25 +363,13 @@
       (p.compareAt ? ' <s>' + money(p.compareAt) + '</s><span class="value-note">You save ' + money(p.compareAt - p.price) + '</span>' : '') + '</div>' +
       '<p>' + esc(p.description) + '</p>' + includes +
       (p.details ? '<ul>' + p.details.map(function (d) { return '<li>' + esc(d) + '</li>'; }).join('') + '</ul>' : '') +
-      '<div class="qv-actions">' +
-      '<div class="qty"><button type="button" data-step="-1" aria-label="Decrease quantity">&minus;</button>' +
-      '<input type="number" min="1" max="' + MAX_QTY + '" value="1" aria-label="Quantity"><button type="button" data-step="1" aria-label="Increase quantity">+</button></div>' +
-      '<button class="btn" type="button" data-qv-add>Add to bag</button></div>' +
+      '<div class="qv-actions">' + buyButton(p, 'btn') + '</div>' +
+      '<p class="muted" style="font-size:.8rem;margin:12px 0 0">' + (p.paymentLink
+        ? 'Secure checkout by Stripe. Choose quantity and shipping at checkout.'
+        : 'Online checkout for this piece is coming soon &mdash; send us a note and we&rsquo;ll arrange your order.') + '</p>' +
       '<p class="credit">Photo: <a href="https://unsplash.com/@' + esc(p.credit.username) + utm + '" target="_blank" rel="noopener">' + esc(p.credit.name) + '</a> on <a href="https://unsplash.com/' + utm + '" target="_blank" rel="noopener">Unsplash</a></p>' +
       '</div></div>';
-    var input = $('input', dlg);
-    $all('[data-step]', dlg).forEach(function (b) {
-      b.addEventListener('click', function () {
-        input.value = Math.max(1, Math.min(MAX_QTY, (parseInt(input.value, 10) || 1) + parseInt(b.getAttribute('data-step'), 10)));
-      });
-    });
     $('.qv-close', dlg).addEventListener('click', function () { dlg.close(); });
-    $('[data-qv-add]', dlg).addEventListener('click', function () {
-      var q = Math.max(1, Math.min(MAX_QTY, parseInt(input.value, 10) || 1));
-      Cart.add(p.id, q);
-      dlg.close();
-      toast(esc(p.name) + (q > 1 ? ' &times; ' + q : '') + ' added to your bag <a href="cart.html">View bag</a>');
-    });
     dlg.showModal();
   }
 
@@ -500,160 +428,61 @@
     }).catch(function () { grid.innerHTML = '<p class="muted">We could not load the collection. Please refresh the page.</p>'; });
   }
 
-  function initCart() {
-    var root = $('#cart-root');
-    var checkoutEnabled = null;
-    fetch('api/config').then(function (r) { return r.ok ? r.json() : { checkoutEnabled: false }; })
-      .then(function (c) { checkoutEnabled = !!c.checkoutEnabled; })
-      .catch(function () { checkoutEnabled = false; });
-
-    function render(data) {
-      var items = Cart.items().filter(function (i) { return data.byId[i.id]; });
-      if (!items.length) {
-        root.innerHTML = '<div class="glass empty-state reveal">' +
-          '<span class="eyebrow">Your bag</span><h2>Your bag is waiting</h2>' +
-          '<p class="lead" style="margin:0 auto 28px">Nothing here just yet. Explore the collection — or start with one of our gift sets.</p>' +
-          '<div class="hero-actions"><a class="btn" href="products.html">Shop the collection</a><a class="btn btn-ghost" href="products.html?category=gift-sets">Gift sets</a></div></div>';
-        initReveal(root);
-        return;
-      }
-      var subtotal = items.reduce(function (s, i) { return s + data.byId[i.id].price * i.qty; }, 0);
-      var remaining = Math.max(0, FREE_SHIPPING_THRESHOLD - subtotal);
-      var shipping = remaining === 0 ? 0 : STANDARD_SHIPPING;
-      var pct = Math.min(100, Math.round((subtotal / FREE_SHIPPING_THRESHOLD) * 100));
-
-      root.innerHTML = '<div class="cart-layout">' +
-        '<section class="glass glass-pad" aria-label="Items in your bag">' +
-        items.map(function (i) {
-          var p = data.byId[i.id];
-          return '<div class="cart-item" data-id="' + esc(p.id) + '">' +
-            '<img src="' + imgUrl(p.image, 200, 200) + '" alt="' + esc(p.alt) + '" loading="lazy">' +
-            '<div><div class="product-cat">' + esc(data.catNames[p.category]) + '</div><h3>' + esc(p.name) + '</h3>' +
-            '<div class="muted" style="font-size:.9rem">' + money(p.price) + ' each</div>' +
-            '<div class="cart-item-controls"><div class="qty">' +
-            '<button type="button" data-cart-step="-1" aria-label="Decrease quantity of ' + esc(p.name) + '">&minus;</button>' +
-            '<input type="number" min="1" max="' + MAX_QTY + '" value="' + i.qty + '" aria-label="Quantity of ' + esc(p.name) + '">' +
-            '<button type="button" data-cart-step="1" aria-label="Increase quantity of ' + esc(p.name) + '">+</button></div>' +
-            '<button class="remove" type="button" data-remove>Remove</button></div></div>' +
-            '<div class="line-total price">' + moneyExact(p.price * i.qty) + '</div></div>';
-        }).join('') +
-        '</section>' +
-        '<aside class="glass glass-pad" aria-label="Order summary">' +
-        '<h2 style="font-size:1.8rem">Order summary</h2>' +
-        (remaining > 0
-          ? '<p style="font-size:.9rem;margin:0">You are <strong>' + moneyExact(remaining) + '</strong> away from complimentary shipping.</p>'
-          : '<p style="font-size:.9rem;margin:0">Your order ships <strong>complimentary</strong>.</p>') +
-        '<div class="progress" aria-hidden="true"><span style="width:' + pct + '%"></span></div>' +
-        '<div class="summary-row" style="margin-top:14px"><span>Subtotal</span><span>' + moneyExact(subtotal) + '</span></div>' +
-        '<div class="summary-row"><span>Standard shipping</span><span>' + (shipping ? moneyExact(shipping) : 'Complimentary') + '</span></div>' +
-        '<div class="summary-row"><span>Sales tax</span><span class="muted">Calculated at checkout</span></div>' +
-        '<div class="summary-row total"><span>Estimated total</span><span>' + moneyExact(subtotal + shipping) + '</span></div>' +
-        '<button class="btn btn-block" type="button" id="checkout-btn" style="margin-top:22px">' + ICONS.lock.replace('<svg', '<svg width="14" height="14"') + ' Secure checkout</button>' +
-        '<p class="form-status" id="checkout-status" role="alert"></p>' +
-        '<div class="pay-note">' + ICONS.lock + '<span>Payments are processed securely by Stripe. We never see or store your card details.</span></div>' +
-        '<p style="font-size:.8rem;margin-top:16px" class="muted center">Express shipping and gift notes can be selected at checkout. By checking out you agree to our <a href="terms.html" style="border-bottom:1px solid var(--line)">Terms</a> and <a href="returns.html" style="border-bottom:1px solid var(--line)">Return Policy</a>.</p>' +
-        '<a class="link-arrow" href="products.html" style="display:table;margin:18px auto 0">Continue shopping</a>' +
-        '</aside></div>';
-
-      $all('.cart-item', root).forEach(function (row) {
-        var id = row.getAttribute('data-id');
-        var input = $('input', row);
-        $all('[data-cart-step]', row).forEach(function (b) {
-          b.addEventListener('click', function () {
-            var next = (parseInt(input.value, 10) || 1) + parseInt(b.getAttribute('data-cart-step'), 10);
-            if (next < 1) Cart.remove(id); else Cart.setQty(id, next);
-          });
-        });
-        input.addEventListener('change', function () {
-          var v = parseInt(input.value, 10);
-          if (!v || v < 1) Cart.remove(id); else Cart.setQty(id, v);
-        });
-        $('[data-remove]', row).addEventListener('click', function () { Cart.remove(id); });
-      });
-
-      $('#checkout-btn', root).addEventListener('click', function () { startCheckout(items); });
-    }
-
-    function startCheckout(items) {
-      var btn = $('#checkout-btn');
-      var status = $('#checkout-status');
-      status.className = 'form-status';
-      status.textContent = '';
-      if (checkoutEnabled === false) {
-        status.className = 'form-status err';
-        status.innerHTML = 'Online checkout is being set up. To place your order now, please email <a href="mailto:' + BUSINESS.email + '">' + BUSINESS.email + '</a> or call <a href="tel:' + BUSINESS.phoneHref + '">' + BUSINESS.phone + '</a>.';
-        return;
-      }
-      btn.disabled = true;
-      btn.textContent = 'Preparing secure checkout…';
-      fetch('api/create-checkout-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items: items.map(function (i) { return { id: i.id, qty: i.qty }; }) })
-      }).then(function (r) {
-        return r.json().catch(function () { return {}; }).then(function (body) { return { ok: r.ok, body: body }; });
-      }).then(function (res) {
-        if (res.ok && res.body.url) { window.location.href = res.body.url; return; }
-        throw new Error(res.body.error || 'Checkout is unavailable right now.');
-      }).catch(function (err) {
-        btn.disabled = false;
-        btn.innerHTML = ICONS.lock.replace('<svg', '<svg width="14" height="14"') + ' Secure checkout';
-        status.className = 'form-status err';
-        status.innerHTML = esc(err.message) + ' You can also order by emailing <a href="mailto:' + BUSINESS.email + '">' + BUSINESS.email + '</a>.';
-      });
-    }
-
-    getCatalog().then(function (data) {
-      render(data);
-      document.addEventListener('cart:change', function () { render(data); });
-    }).catch(function () { root.innerHTML = '<p class="muted">We could not load your bag. Please refresh the page.</p>'; });
-  }
-
   function initContact() {
     var form = $('#contact-form');
     if (!form) return;
     var status = $('#contact-status');
+
+    // Arriving from an "Inquire to order" button: prefill the message
+    var productId = new URLSearchParams(location.search).get('product');
+    if (productId) {
+      getCatalog().then(function (data) {
+        var p = data.byId[productId];
+        if (!p) return;
+        $('#cf-subject').value = 'Order inquiry';
+        var msg = $('#cf-message');
+        if (!msg.value) msg.value = 'Hello! I would like to order the ' + p.name + ' (' + money(p.price) + '). Quantity: 1\n\nShipping ZIP code: ';
+      });
+    }
+
     form.addEventListener('submit', function (e) {
       e.preventDefault();
       if (!form.checkValidity()) { form.reportValidity(); return; }
+      var data = new FormData(form);
+
+      if (!FORMSPREE_FORM_ID) {
+        // No form service connected yet: hand the message to the visitor's email app.
+        var body = ['Name: ' + data.get('name'), 'Email: ' + data.get('email'),
+          data.get('phone') ? 'Phone: ' + data.get('phone') : '',
+          data.get('orderNumber') ? 'Order #: ' + data.get('orderNumber') : '', '', data.get('message')]
+          .filter(function (l, i) { return l !== '' || i === 4; }).join('\n');
+        location.href = 'mailto:' + BUSINESS.email + '?subject=' + encodeURIComponent(data.get('subject') + ' — ' + data.get('name')) +
+          '&body=' + encodeURIComponent(body);
+        status.className = 'form-status ok';
+        status.innerHTML = 'Your email app should open with your message ready to send. If it doesn&rsquo;t, email us at <a href="mailto:' + BUSINESS.email + '">' + BUSINESS.email + '</a>.';
+        return;
+      }
+
       var btn = $('button[type="submit"]', form);
-      var payload = {};
-      new FormData(form).forEach(function (v, k) { payload[k] = v; });
       btn.disabled = true;
       btn.textContent = 'Sending…';
       status.className = 'form-status';
       status.textContent = '';
-      fetch('api/contact', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-        .then(function (r) { return r.json().catch(function () { return {}; }).then(function (b) { return { ok: r.ok, body: b }; }); })
-        .then(function (res) {
-          if (!res.ok) throw new Error(res.body.error || 'Something went wrong.');
+      data.append('_subject', 'Website: ' + data.get('subject') + ' — ' + data.get('name'));
+      data.append('_replyto', data.get('email'));
+      fetch('https://formspree.io/f/' + FORMSPREE_FORM_ID, { method: 'POST', body: data, headers: { Accept: 'application/json' } })
+        .then(function (r) { if (!r.ok) throw new Error('send'); })
+        .then(function () {
           form.reset();
           status.className = 'form-status ok';
           status.textContent = 'Thank you — your message has been received. We reply within one business day.';
         })
-        .catch(function (err) {
+        .catch(function () {
           status.className = 'form-status err';
-          status.innerHTML = esc(err.message) + ' You can also reach us at <a href="mailto:' + BUSINESS.email + '">' + BUSINESS.email + '</a>.';
+          status.innerHTML = 'We couldn&rsquo;t send your message. Please email us at <a href="mailto:' + BUSINESS.email + '">' + BUSINESS.email + '</a>.';
         })
         .then(function () { btn.disabled = false; btn.textContent = 'Send message'; });
     });
-  }
-
-  function initSuccess() {
-    Cart.clear();
-    var params = new URLSearchParams(location.search);
-    var id = params.get('session_id');
-    var detail = $('#order-detail');
-    if (!id || !detail) return;
-    fetch('api/checkout-session?session_id=' + encodeURIComponent(id))
-      .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (s) {
-        if (!s) return;
-        detail.innerHTML = (s.name ? 'Thank you, <strong>' + esc(s.name.split(' ')[0]) + '</strong>. ' : '') +
-          (s.email ? 'A receipt is on its way to <strong>' + esc(s.email) + '</strong>. ' : '') +
-          (typeof s.amountTotal === 'number' ? 'Order total: <strong>' + moneyExact(s.amountTotal) + '</strong>.' : '');
-      })
-      .catch(function () { /* the generic message is fine */ });
   }
 
   // ---------------------------------------------------------------- boot
@@ -662,21 +491,16 @@
     initSparkles();
     renderHeader();
     renderFooter();
-    updateCartCount(false);
     initReveal(document);
 
     var page = document.body.getAttribute('data-page');
     if (page === 'home') initHome();
     if (page === 'products') initProducts();
-    if (page === 'cart') initCart();
     if (page === 'contact') initContact();
-    if (page === 'success') initSuccess();
 
     setTimeout(function () { showCookieBanner(false); }, 900);
 
-    // Keep the bag count in sync across tabs
-    window.addEventListener('storage', function (e) { if (e.key === CART_KEY) { updateCartCount(false); document.dispatchEvent(new CustomEvent('cart:change')); } });
   });
 
-  window.LKL = { Cart: Cart, getCatalog: getCatalog, BUSINESS: BUSINESS, ICONS: ICONS };
+  window.LKL = { getCatalog: getCatalog, BUSINESS: BUSINESS, ICONS: ICONS };
 })();
