@@ -14,9 +14,10 @@ It's a static site on a small Node/Express server that handles **Stripe Checkout
 | Shopping bag / checkout | `public/cart.html` → Stripe Checkout |
 | Order confirmation | `public/success.html` |
 | Shipping Policy | `public/shipping.html` |
-| Returns & Refunds | `public/returns.html` |
+| Return Policy | `public/returns.html` |
 | Terms & Conditions | `public/terms.html` |
-| Privacy & Cookie Policy | `public/privacy.html` |
+| Privacy Policy | `public/privacy.html` |
+| Cookie Policy | `public/cookies.html` |
 | Legal Notice | `public/legal.html` |
 
 The header, footer, cookie banner, and sparkle background are added to every page by `public/js/main.js`. Styles are in `public/css/styles.css`.
@@ -61,4 +62,4 @@ This site needs a host that runs Node, such as Render, Railway, Fly.io, Heroku, 
 
 ## Policies
 
-The policy pages are professionally written starting drafts. **Replace them with your own policy documents, and have them reviewed by a qualified attorney.**
+The Shipping, Return, Privacy, Cookie, Terms and Legal Notice pages use the owner's policy documents (last updated August 1, 2026), with contact details set to contact@ladykattluxe.shop and 904-663-2417. The cookie banner matches the Cookie Policy (essential cookies only).

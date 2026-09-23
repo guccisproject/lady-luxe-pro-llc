@@ -118,7 +118,7 @@ app.post('/api/create-checkout-session', async (req, res) => {
             fixed_amount: { amount: freeShipping ? 0 : STANDARD_SHIPPING, currency: 'usd' },
             delivery_estimate: {
               minimum: { unit: 'business_day', value: 3 },
-              maximum: { unit: 'business_day', value: 7 },
+              maximum: { unit: 'business_day', value: 10 },
             },
           },
         },
@@ -145,7 +145,7 @@ app.post('/api/create-checkout-session', async (req, res) => {
       ],
       custom_text: {
         submit: {
-          message: `By completing your purchase you agree to our Terms & Conditions (${SITE_URL}/terms.html) and Returns & Refunds Policy (${SITE_URL}/returns.html).`,
+          message: `By completing your purchase you agree to our Terms & Conditions (${SITE_URL}/terms.html) and Return Policy (${SITE_URL}/returns.html).`,
         },
       },
       allow_promotion_codes: true,

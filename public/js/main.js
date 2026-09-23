@@ -26,9 +26,10 @@
   ];
   var POLICIES = [
     { href: 'shipping.html', label: 'Shipping Policy' },
-    { href: 'returns.html', label: 'Returns & Refunds' },
+    { href: 'returns.html', label: 'Return Policy' },
     { href: 'terms.html', label: 'Terms & Conditions' },
-    { href: 'privacy.html', label: 'Privacy & Cookies' },
+    { href: 'privacy.html', label: 'Privacy Policy' },
+    { href: 'cookies.html', label: 'Cookie Policy' },
     { href: 'legal.html', label: 'Legal Notice' }
   ];
 
@@ -343,12 +344,12 @@
       el.setAttribute('aria-live', 'polite');
       el.setAttribute('aria-label', 'Cookie consent');
       el.innerHTML =
-        '<p>We use essential cookies and local storage to keep your bag and preferences, and to process checkout securely through Stripe. ' +
-        'With your permission, we may also use optional cookies to understand how our site is used. ' +
-        '<a href="privacy.html#cookies">Learn more</a></p>' +
+        '<p>We use essential cookies only &mdash; to keep items in your bag, enable secure checkout, and maintain site security and performance. ' +
+        'We do not use cookies for advertising, third-party tracking, or analytics. ' +
+        '<a href="cookies.html">Read our Cookie Policy</a></p>' +
         '<div class="cookie-actions">' +
-        '<button type="button" class="btn btn-ghost btn-sm" data-consent="essential">Essential only</button>' +
-        '<button type="button" class="btn btn-sm" data-consent="all">Accept all</button>' +
+        '<a class="btn btn-ghost btn-sm" href="cookies.html">Learn more</a>' +
+        '<button type="button" class="btn btn-sm" data-consent="essential">Accept</button>' +
         '</div>';
       document.body.appendChild(el);
       $all('[data-consent]', el).forEach(function (b) {
@@ -550,7 +551,7 @@
         '<button class="btn btn-block" type="button" id="checkout-btn" style="margin-top:22px">' + ICONS.lock.replace('<svg', '<svg width="14" height="14"') + ' Secure checkout</button>' +
         '<p class="form-status" id="checkout-status" role="alert"></p>' +
         '<div class="pay-note">' + ICONS.lock + '<span>Payments are processed securely by Stripe. We never see or store your card details.</span></div>' +
-        '<p style="font-size:.8rem;margin-top:16px" class="muted center">Express shipping and gift notes can be selected at checkout. By checking out you agree to our <a href="terms.html" style="border-bottom:1px solid var(--line)">Terms</a> and <a href="returns.html" style="border-bottom:1px solid var(--line)">Returns Policy</a>.</p>' +
+        '<p style="font-size:.8rem;margin-top:16px" class="muted center">Express shipping and gift notes can be selected at checkout. By checking out you agree to our <a href="terms.html" style="border-bottom:1px solid var(--line)">Terms</a> and <a href="returns.html" style="border-bottom:1px solid var(--line)">Return Policy</a>.</p>' +
         '<a class="link-arrow" href="products.html" style="display:table;margin:18px auto 0">Continue shopping</a>' +
         '</aside></div>';
 
