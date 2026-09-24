@@ -12,10 +12,11 @@
     businessId: '1556312'
   };
 
-  // Contact form delivery via Formspree (https://formspree.io). Create a form
-  // for contact@ladykattluxe.shop and paste its ID here, e.g. 'xyzabcde'.
-  // Until this is set, the contact form opens the visitor's email app instead.
+  // Contact form and order requests are delivered via Formspree (https://formspree.io).
+  // Create a form for contact@ladykattluxe.shop and paste its ID here, e.g. 'xyzabcde'.
+  // Until this is set, both forms open the visitor's email app instead.
   var FORMSPREE_FORM_ID = '';
+  var MAX_QTY = 10;
 
   var NAV = [
     { href: 'index.html', label: 'Home', page: 'home' },
@@ -88,6 +89,78 @@
     return catalogPromise;
   }
 
+  function moneyExact(cents) { return '$' + (cents / 100).toFixed(2); }
+
+  // Sends a form either through Formspree or, if it isn't connected yet, by
+  // opening the visitor's email app with the message filled in.
+  // Resolves with 'sent' or 'mailto'.
+  function deliver(subject, replyTo, text, fields) {
+    if (!FORMSPREE_FORM_ID) {
+      location.href = 'mailto:' + BUSINESS.email + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(text);
+      return Promise.resolve('mailto');
+    }
+    var data = new FormData();
+    Object.keys(fields || {}).forEach(function (k) { data.append(k, fields[k]); });
+    data.append('_subject', subject);
+    data.append('_replyto', replyTo);
+    return fetch('https://formspree.io/f/' + FORMSPREE_FORM_ID, { method: 'POST', body: data, headers: { Accept: 'application/json' } })
+      .then(function (r) { if (!r.ok) throw new Error('send'); return 'sent'; });
+  }
+
+  // ---------------------------------------------------------------- cart
+
+  var CART_KEY = 'lkl_cart_v1';
+  var Cart = {
+    items: function () {
+      var raw = storageGet(CART_KEY, []);
+      return Array.isArray(raw) ? raw.filter(function (i) { return i && i.id && i.qty > 0; }) : [];
+    },
+    save: function (items) { storageSet(CART_KEY, items); updateCartCount(true); document.dispatchEvent(new CustomEvent('cart:change')); },
+    count: function () { return Cart.items().reduce(function (n, i) { return n + i.qty; }, 0); },
+    add: function (id, qty) {
+      var items = Cart.items();
+      var found = items.filter(function (i) { return i.id === id; })[0];
+      if (found) found.qty = Math.min(MAX_QTY, found.qty + (qty || 1));
+      else items.push({ id: id, qty: Math.min(MAX_QTY, qty || 1) });
+      Cart.save(items);
+    },
+    setQty: function (id, qty) {
+      var items = Cart.items().map(function (i) { if (i.id === id) i.qty = Math.max(0, Math.min(MAX_QTY, qty)); return i; })
+        .filter(function (i) { return i.qty > 0; });
+      Cart.save(items);
+    },
+    remove: function (id) { Cart.save(Cart.items().filter(function (i) { return i.id !== id; })); },
+    clear: function () { Cart.save([]); }
+  };
+
+  function updateCartCount(bump) {
+    var n = Cart.count();
+    $all('.cart-count').forEach(function (el) {
+      el.textContent = n;
+      el.setAttribute('data-count', n);
+      if (bump) { el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
+    });
+    $all('.cart-link').forEach(function (el) { el.setAttribute('aria-label', 'Shopping bag, ' + n + (n === 1 ? ' item' : ' items')); });
+  }
+
+  // ---------------------------------------------------------------- toast
+
+  var toastTimer;
+  function toast(html) {
+    var t = $('.toast');
+    if (!t) {
+      t = document.createElement('div');
+      t.className = 'toast';
+      t.setAttribute('role', 'status');
+      t.setAttribute('aria-live', 'polite');
+      document.body.appendChild(t);
+    }
+    t.innerHTML = html;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove('show'); }, 3200);
+  }
+
   // ---------------------------------------------------------------- chrome
 
   function brandHtml() {
@@ -110,6 +183,8 @@
       }).join('') +
       '</nav>' +
       '<div class="header-actions">' +
+      '<a class="cart-link" href="cart.html"' + (page === 'cart' ? ' aria-current="page"' : '') + '>' + ICONS.bag +
+      '<span class="cart-label">Bag</span><span class="cart-count" data-count="0">0</span></a>' +
       '<button class="menu-toggle" type="button" aria-controls="site-nav" aria-expanded="false" aria-label="Open menu"><span></span></button>' +
       '</div></div>';
     document.body.insertBefore(header, document.body.firstChild);
@@ -145,7 +220,7 @@
       '<p style="margin-top:18px">Refined pieces for everyday life — thoughtfully chosen, beautifully packaged, and shipped with care from Titusville, Florida to your door.</p></div>' +
       '<div><h4>Explore</h4><ul>' +
       NAV.map(function (n) { return '<li><a href="' + n.href + '">' + n.label + '</a></li>'; }).join('') +
-      '</ul></div>' +
+      '<li><a href="cart.html">Shopping Bag</a></li></ul></div>' +
       '<div><h4>Policies</h4><ul>' +
       POLICIES.map(function (p) { return '<li><a href="' + p.href + '">' + p.label + '</a></li>'; }).join('') +
       '<li><a href="#" data-cookie-settings>Cookie Settings</a></li></ul></div>' +
@@ -286,7 +361,7 @@
       el.setAttribute('aria-live', 'polite');
       el.setAttribute('aria-label', 'Cookie consent');
       el.innerHTML =
-        '<p>We use essential cookies only &mdash; to remember your cookie preference, enable secure checkout, and maintain site security and performance. ' +
+        '<p>We use essential cookies only &mdash; to keep items in your bag, remember your cookie preference, and maintain site security and performance. ' +
         'We do not use cookies for advertising, third-party tracking, or analytics. ' +
         '<a href="cookies.html">Read our Cookie Policy</a></p>' +
         '<div class="cookie-actions">' +
@@ -318,21 +393,23 @@
       '<h3 class="product-title">' + esc(p.name) + '</h3>' +
       '<p class="product-desc">' + esc(p.description) + '</p>' +
       '<div class="product-foot"><div class="price">' + money(p.price) + save + '</div>' +
-      buyButton(p, 'add-btn') + '</div>' +
+      '<button class="add-btn" type="button" data-add="' + esc(p.id) + '">Add to bag</button></div>' +
       '</div></article>';
-  }
-
-  // Checkout happens on Stripe through a Payment Link for each product. Products
-  // without a link yet fall back to an order inquiry on the contact page.
-  function buyButton(p, cls) {
-    if (p.paymentLink) {
-      return '<a class="' + cls + '" href="' + esc(p.paymentLink) + '" rel="noopener">Buy now</a>';
-    }
-    return '<a class="' + cls + '" href="contact.html?product=' + encodeURIComponent(p.id) + '">Inquire to order</a>';
   }
 
   function bindProductActions(root, data) {
     root.addEventListener('click', function (e) {
+      var add = e.target.closest('[data-add]');
+      if (add) {
+        var p = data.byId[add.getAttribute('data-add')];
+        if (!p) return;
+        Cart.add(p.id, 1);
+        add.classList.add('added');
+        add.textContent = 'Added';
+        setTimeout(function () { add.classList.remove('added'); add.textContent = 'Add to bag'; }, 1600);
+        toast(esc(p.name) + ' added to your bag <a href="cart.html">View bag</a>');
+        return;
+      }
       var qv = e.target.closest('[data-quickview]');
       if (qv) openQuickView(data.byId[qv.getAttribute('data-quickview')], data);
     });
@@ -347,7 +424,7 @@
       document.body.appendChild(dlg);
       dlg.addEventListener('click', function (e) { if (e.target === dlg) dlg.close(); });
     }
-    if (typeof dlg.showModal !== 'function') { location.href = p.paymentLink || ('contact.html?product=' + encodeURIComponent(p.id)); return; }
+    if (typeof dlg.showModal !== 'function') { Cart.add(p.id, 1); toast(esc(p.name) + ' added to your bag'); return; }
     var includes = p.includes ? '<div class="qv-includes"><h4>Inside the set</h4><ul>' +
       p.includes.map(function (i) { return '<li>' + esc(i) + '</li>'; }).join('') + '</ul></div>' : '';
     var utm = '?utm_source=lady_katt_luxe&utm_medium=referral';
@@ -362,13 +439,25 @@
       (p.compareAt ? ' <s>' + money(p.compareAt) + '</s><span class="value-note">You save ' + money(p.compareAt - p.price) + '</span>' : '') + '</div>' +
       '<p>' + esc(p.description) + '</p>' + includes +
       (p.details ? '<ul>' + p.details.map(function (d) { return '<li>' + esc(d) + '</li>'; }).join('') + '</ul>' : '') +
-      '<div class="qv-actions">' + buyButton(p, 'btn') + '</div>' +
-      '<p class="muted" style="font-size:.8rem;margin:12px 0 0">' + (p.paymentLink
-        ? 'Secure checkout by Stripe. Choose quantity and shipping at checkout.'
-        : 'Online checkout for this piece is coming soon &mdash; send us a note and we&rsquo;ll arrange your order.') + '</p>' +
+      '<div class="qv-actions">' +
+      '<div class="qty"><button type="button" data-step="-1" aria-label="Decrease quantity">&minus;</button>' +
+      '<input type="number" min="1" max="' + MAX_QTY + '" value="1" aria-label="Quantity"><button type="button" data-step="1" aria-label="Increase quantity">+</button></div>' +
+      '<button class="btn" type="button" data-qv-add>Add to bag</button></div>' +
       '<p class="credit">Photo: <a href="https://unsplash.com/@' + esc(p.credit.username) + utm + '" target="_blank" rel="noopener">' + esc(p.credit.name) + '</a> on <a href="https://unsplash.com/' + utm + '" target="_blank" rel="noopener">Unsplash</a></p>' +
       '</div></div>';
+    var input = $('input', dlg);
+    $all('[data-step]', dlg).forEach(function (b) {
+      b.addEventListener('click', function () {
+        input.value = Math.max(1, Math.min(MAX_QTY, (parseInt(input.value, 10) || 1) + parseInt(b.getAttribute('data-step'), 10)));
+      });
+    });
     $('.qv-close', dlg).addEventListener('click', function () { dlg.close(); });
+    $('[data-qv-add]', dlg).addEventListener('click', function () {
+      var q = Math.max(1, Math.min(MAX_QTY, parseInt(input.value, 10) || 1));
+      Cart.add(p.id, q);
+      dlg.close();
+      toast(esc(p.name) + (q > 1 ? ' &times; ' + q : '') + ' added to your bag <a href="cart.html">View bag</a>');
+    });
     dlg.showModal();
   }
 
@@ -427,6 +516,190 @@
     }).catch(function () { grid.innerHTML = '<p class="muted">We could not load the collection. Please refresh the page.</p>'; });
   }
 
+  // ---------------------------------------------------------------- bag & order request
+  // Customers send an order request with their shipping details. Lady Katt Luxe
+  // then emails a payment request with the final total (including shipping)
+  // and ships once it's paid.
+
+  var US_STATES = 'AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY'.split(' ');
+
+  function newOrderNumber() {
+    var d = new Date();
+    var ymd = String(d.getFullYear()).slice(2) + ('0' + (d.getMonth() + 1)).slice(-2) + ('0' + d.getDate()).slice(-2);
+    var rand = Math.random().toString(36).slice(2, 6).toUpperCase();
+    return 'LKL-' + ymd + '-' + rand;
+  }
+
+  function initCart() {
+    var root = $('#cart-root');
+
+    function field(id, label, attrs, full) {
+      return '<div' + (full ? ' class="full"' : '') + '><label for="co-' + id + '">' + label + '</label><input id="co-' + id + '" name="' + id + '" ' + attrs + '></div>';
+    }
+
+    function render(data) {
+      var items = Cart.items().filter(function (i) { return data.byId[i.id]; });
+      if (!items.length) {
+        root.innerHTML = '<div class="glass empty-state reveal">' +
+          '<span class="eyebrow">Your bag</span><h2>Your bag is waiting</h2>' +
+          '<p class="lead" style="margin:0 auto 28px">Nothing here just yet. Explore the collection — or start with one of our gift sets.</p>' +
+          '<div class="hero-actions"><a class="btn" href="products.html">Shop the collection</a><a class="btn btn-ghost" href="products.html?category=gift-sets">Gift sets</a></div></div>';
+        initReveal(root);
+        return;
+      }
+      var subtotal = items.reduce(function (s, i) { return s + data.byId[i.id].price * i.qty; }, 0);
+
+      root.innerHTML = '<div class="cart-layout">' +
+        '<div>' +
+        '<section class="glass glass-pad" aria-label="Items in your bag">' +
+        items.map(function (i) {
+          var p = data.byId[i.id];
+          return '<div class="cart-item" data-id="' + esc(p.id) + '">' +
+            '<img src="' + imgUrl(p.image, 200, 200) + '" alt="' + esc(p.alt) + '" loading="lazy">' +
+            '<div><div class="product-cat">' + esc(data.catNames[p.category]) + '</div><h3>' + esc(p.name) + '</h3>' +
+            '<div class="muted" style="font-size:.9rem">' + money(p.price) + ' each</div>' +
+            '<div class="cart-item-controls"><div class="qty">' +
+            '<button type="button" data-cart-step="-1" aria-label="Decrease quantity of ' + esc(p.name) + '">&minus;</button>' +
+            '<input type="number" min="1" max="' + MAX_QTY + '" value="' + i.qty + '" aria-label="Quantity of ' + esc(p.name) + '">' +
+            '<button type="button" data-cart-step="1" aria-label="Increase quantity of ' + esc(p.name) + '">+</button></div>' +
+            '<button class="remove" type="button" data-remove>Remove</button></div></div>' +
+            '<div class="line-total price">' + moneyExact(p.price * i.qty) + '</div></div>';
+        }).join('') +
+        '</section>' +
+
+        '<section class="glass glass-pad" id="checkout" aria-label="Checkout" style="margin-top:clamp(16px,2.5vw,32px)">' +
+        '<h2 style="font-size:1.9rem">Checkout</h2>' +
+        '<p style="font-size:.95rem">Send us your order and shipping details. We&rsquo;ll reply within one business day with your total, including shipping, and a secure way to pay. Your order ships as soon as payment is received.</p>' +
+        '<form id="checkout-form" class="form-grid" novalidate>' +
+        field('name', 'Full name', 'type="text" autocomplete="name" required maxlength="120"') +
+        field('email', 'Email', 'type="email" autocomplete="email" required maxlength="200"') +
+        field('phone', 'Phone', 'type="tel" autocomplete="tel" required maxlength="40"', true) +
+        field('address1', 'Street address', 'type="text" autocomplete="address-line1" required maxlength="160"', true) +
+        field('address2', 'Apt, suite, etc. <span class="muted" style="letter-spacing:.1em;text-transform:none">(optional)</span>', 'type="text" autocomplete="address-line2" maxlength="160"', true) +
+        field('city', 'City', 'type="text" autocomplete="address-level2" required maxlength="80"') +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
+        '<div><label for="co-state">State</label><select class="field" id="co-state" name="state" autocomplete="address-level1" required><option value=""></option>' +
+        US_STATES.map(function (st) { return '<option>' + st + '</option>'; }).join('') + '</select></div>' +
+        '<div><label for="co-zip">ZIP</label><input id="co-zip" name="zip" type="text" inputmode="numeric" autocomplete="postal-code" required pattern="\\d{5}(-\\d{4})?" maxlength="10"></div>' +
+        '</div>' +
+        '<div class="full"><label for="co-shipping">Shipping</label><select class="field" id="co-shipping" name="shipping"><option>Standard (3–10 business days)</option><option>Express (2–3 business days)</option></select></div>' +
+        '<div class="full"><label for="co-gift">Gift note <span class="muted" style="letter-spacing:.1em;text-transform:none">(optional)</span></label><textarea id="co-gift" name="giftNote" maxlength="255" style="min-height:90px" placeholder="We&rsquo;ll handwrite this and tuck it inside."></textarea></div>' +
+        '<div class="full"><label for="co-notes">Order notes <span class="muted" style="letter-spacing:.1em;text-transform:none">(optional)</span></label><textarea id="co-notes" name="notes" maxlength="1000" style="min-height:90px"></textarea></div>' +
+        '<div class="hp" aria-hidden="true"><label for="co-website">Website</label><input id="co-website" name="_gotcha" type="text" tabindex="-1" autocomplete="off"></div>' +
+        '<div class="full"><button class="btn" type="submit">Place order request</button>' +
+        '<p class="form-status" id="checkout-status" role="status" aria-live="polite"></p>' +
+        '<p class="muted" style="font-size:.8rem;margin:0">No payment is taken on this site. By placing an order request you agree to our <a href="terms.html" style="border-bottom:1px solid var(--line)">Terms</a>, <a href="shipping.html" style="border-bottom:1px solid var(--line)">Shipping Policy</a>, and <a href="returns.html" style="border-bottom:1px solid var(--line)">Return Policy</a>.</p></div>' +
+        '</form></section>' +
+        '</div>' +
+
+        '<aside class="glass glass-pad summary-panel" aria-label="Order summary">' +
+        '<h2 style="font-size:1.8rem">Order summary</h2>' +
+        items.map(function (i) {
+          var p = data.byId[i.id];
+          return '<div class="summary-row" style="font-size:.92rem"><span>' + esc(p.name) + ' &times; ' + i.qty + '</span><span>' + moneyExact(p.price * i.qty) + '</span></div>';
+        }).join('') +
+        '<div class="summary-row total"><span>Subtotal</span><span>' + moneyExact(subtotal) + '</span></div>' +
+        '<p class="muted" style="font-size:.85rem;margin:10px 0 0">Shipping and any applicable sales tax are added to your payment request.</p>' +
+        '<a class="btn btn-block" href="#checkout" style="margin-top:22px">Continue to checkout</a>' +
+        '<a class="link-arrow" href="products.html" style="display:table;margin:18px auto 0">Continue shopping</a>' +
+        '</aside></div>';
+
+      $all('.cart-item', root).forEach(function (row) {
+        var id = row.getAttribute('data-id');
+        var input = $('input', row);
+        $all('[data-cart-step]', row).forEach(function (b) {
+          b.addEventListener('click', function () {
+            var next = (parseInt(input.value, 10) || 1) + parseInt(b.getAttribute('data-cart-step'), 10);
+            if (next < 1) Cart.remove(id); else Cart.setQty(id, next);
+          });
+        });
+        input.addEventListener('change', function () {
+          var v = parseInt(input.value, 10);
+          if (!v || v < 1) Cart.remove(id); else Cart.setQty(id, v);
+        });
+        $('[data-remove]', row).addEventListener('click', function () { Cart.remove(id); });
+      });
+
+      bindCheckout($('#checkout-form', root), items, subtotal, data);
+    }
+
+    // Keep what the customer typed if the bag re-renders (quantity changes etc.)
+    var draft = {};
+    function bindCheckout(form, items, subtotal, data) {
+      Object.keys(draft).forEach(function (k) { if (form.elements[k]) form.elements[k].value = draft[k]; });
+      form.addEventListener('input', function (e) { if (e.target.name) draft[e.target.name] = e.target.value; });
+      form.addEventListener('change', function (e) { if (e.target.name) draft[e.target.name] = e.target.value; });
+
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        if (!form.checkValidity()) { form.reportValidity(); return; }
+        var f = new FormData(form);
+        if (f.get('_gotcha')) return;
+        var order = newOrderNumber();
+        var lines = items.map(function (i) {
+          var p = data.byId[i.id];
+          return '- ' + i.qty + ' × ' + p.name + ' @ ' + moneyExact(p.price) + ' = ' + moneyExact(p.price * i.qty);
+        });
+        var address = [f.get('name'), f.get('address1'), f.get('address2'), f.get('city') + ', ' + f.get('state') + ' ' + f.get('zip')]
+          .filter(function (l) { return l; }).join('\n');
+        var text = [
+          'ORDER REQUEST ' + order, '',
+          'Name: ' + f.get('name'), 'Email: ' + f.get('email'), 'Phone: ' + f.get('phone'), '',
+          'Ship to:', address, 'Shipping: ' + f.get('shipping'), '',
+          'Items:'].concat(lines).concat([
+          'Subtotal: ' + moneyExact(subtotal) + ' (shipping and tax to be added)', '',
+          'Gift note: ' + (f.get('giftNote') || '—'),
+          'Notes: ' + (f.get('notes') || '—')
+        ]).join('\n');
+
+        var btn = $('button[type="submit"]', form);
+        var status = $('#checkout-status');
+        btn.disabled = true;
+        btn.textContent = 'Sending…';
+        status.className = 'form-status';
+        status.textContent = '';
+
+        deliver('Order request ' + order + ' — ' + f.get('name') + ' (' + moneyExact(subtotal) + ')', f.get('email'), text, {
+          order: order, name: f.get('name'), email: f.get('email'), phone: f.get('phone'),
+          shipTo: address, shipping: f.get('shipping'), items: lines.join('\n'),
+          subtotal: moneyExact(subtotal), giftNote: f.get('giftNote'), notes: f.get('notes')
+        }).then(function (how) {
+          if (how === 'sent') {
+            Cart.clear();
+            location.href = 'success.html?order=' + encodeURIComponent(order);
+            return;
+          }
+          // Email app opened — the customer still needs to press send.
+          btn.disabled = false;
+          btn.textContent = 'Place order request';
+          status.className = 'form-status ok';
+          status.innerHTML = 'Your email app should now be open with order <strong>' + order + '</strong> ready to go &mdash; just press <strong>Send</strong>. ' +
+            'If it didn&rsquo;t open, email your order to <a href="mailto:' + BUSINESS.email + '">' + BUSINESS.email + '</a>.' +
+            '<br><button type="button" class="btn btn-sm" id="sent-btn" style="margin-top:14px">I&rsquo;ve sent it</button>';
+          $('#sent-btn').addEventListener('click', function () {
+            Cart.clear();
+            location.href = 'success.html?order=' + encodeURIComponent(order);
+          });
+        }).catch(function () {
+          btn.disabled = false;
+          btn.textContent = 'Place order request';
+          status.className = 'form-status err';
+          status.innerHTML = 'We couldn&rsquo;t send your order. Please try again, or email us at <a href="mailto:' + BUSINESS.email + '">' + BUSINESS.email + '</a>.';
+        });
+      });
+    }
+
+    getCatalog().then(function (data) {
+      render(data);
+      document.addEventListener('cart:change', function () { render(data); });
+    }).catch(function () { root.innerHTML = '<p class="muted">We could not load your bag. Please refresh the page.</p>'; });
+  }
+
+  function initSuccess() {
+    var order = new URLSearchParams(location.search).get('order');
+    if (order && /^LKL-[\w-]{4,20}$/.test(order)) $('#order-number').textContent = order;
+  }
+
   function initContact() {
     var form = $('#contact-form');
     if (!form) return;
@@ -449,32 +722,27 @@
       if (!form.checkValidity()) { form.reportValidity(); return; }
       var data = new FormData(form);
 
-      if (!FORMSPREE_FORM_ID) {
-        // No form service connected yet: hand the message to the visitor's email app.
-        var body = ['Name: ' + data.get('name'), 'Email: ' + data.get('email'),
-          data.get('phone') ? 'Phone: ' + data.get('phone') : '',
-          data.get('orderNumber') ? 'Order #: ' + data.get('orderNumber') : '', '', data.get('message')]
-          .filter(function (l, i) { return l !== '' || i === 4; }).join('\n');
-        location.href = 'mailto:' + BUSINESS.email + '?subject=' + encodeURIComponent(data.get('subject') + ' — ' + data.get('name')) +
-          '&body=' + encodeURIComponent(body);
-        status.className = 'form-status ok';
-        status.innerHTML = 'Your email app should open with your message ready to send. If it doesn&rsquo;t, email us at <a href="mailto:' + BUSINESS.email + '">' + BUSINESS.email + '</a>.';
-        return;
-      }
-
+      var subject = data.get('subject') + ' — ' + data.get('name');
+      var text = ['Name: ' + data.get('name'), 'Email: ' + data.get('email'),
+        data.get('phone') ? 'Phone: ' + data.get('phone') : null,
+        data.get('orderNumber') ? 'Order #: ' + data.get('orderNumber') : null, '', data.get('message')]
+        .filter(function (l) { return l !== null; }).join('\n');
       var btn = $('button[type="submit"]', form);
       btn.disabled = true;
       btn.textContent = 'Sending…';
       status.className = 'form-status';
       status.textContent = '';
-      data.append('_subject', 'Website: ' + data.get('subject') + ' — ' + data.get('name'));
-      data.append('_replyto', data.get('email'));
-      fetch('https://formspree.io/f/' + FORMSPREE_FORM_ID, { method: 'POST', body: data, headers: { Accept: 'application/json' } })
-        .then(function (r) { if (!r.ok) throw new Error('send'); })
-        .then(function () {
-          form.reset();
+      var fields = {};
+      data.forEach(function (v, k) { fields[k] = v; });
+      deliver('Website: ' + subject, data.get('email'), text, fields)
+        .then(function (how) {
           status.className = 'form-status ok';
-          status.textContent = 'Thank you — your message has been received. We reply within one business day.';
+          if (how === 'sent') {
+            form.reset();
+            status.textContent = 'Thank you — your message has been received. We reply within one business day.';
+          } else {
+            status.innerHTML = 'Your email app should open with your message ready to send. If it doesn&rsquo;t, email us at <a href="mailto:' + BUSINESS.email + '">' + BUSINESS.email + '</a>.';
+          }
         })
         .catch(function () {
           status.className = 'form-status err';
@@ -490,16 +758,22 @@
     initSparkles();
     renderHeader();
     renderFooter();
+    updateCartCount(false);
     initReveal(document);
 
     var page = document.body.getAttribute('data-page');
     if (page === 'home') initHome();
     if (page === 'products') initProducts();
     if (page === 'contact') initContact();
+    if (page === 'cart') initCart();
+    if (page === 'success') initSuccess();
 
     setTimeout(function () { showCookieBanner(false); }, 900);
 
+    // Keep the bag count in sync across tabs
+    window.addEventListener('storage', function (e) { if (e.key === CART_KEY) { updateCartCount(false); document.dispatchEvent(new CustomEvent('cart:change')); } });
+
   });
 
-  window.LKL = { getCatalog: getCatalog, BUSINESS: BUSINESS, ICONS: ICONS };
+  window.LKL = { Cart: Cart, getCatalog: getCatalog, BUSINESS: BUSINESS, ICONS: ICONS };
 })();

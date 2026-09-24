@@ -2,7 +2,7 @@
 
 Storefront for **Lady Katt Luxe LLC** (Titusville, FL · Business ID 1556312).
 It's a fully static site built for **GitHub Pages**, with no server to run.
-Checkout uses **Stripe Payment Links** and the contact form uses **Formspree**.
+Checkout works as an **order request**: customers fill their bag and submit their shipping details, and the order is emailed to you. You then send them a payment request (PayPal invoice, Cash App, Zelle, etc.) and ship once they've paid. No payment is taken on the site.
 
 ## Pages
 
@@ -12,7 +12,8 @@ Checkout uses **Stripe Payment Links** and the contact form uses **Formspree**.
 | Shop (category filters, product details) | `products.html` |
 | About Us | `about.html` |
 | Contact | `contact.html` |
-| Order confirmation (Stripe redirects here) | `success.html` |
+| Shopping bag + checkout (order request) | `cart.html` |
+| Order request received | `success.html` |
 | Shipping Policy | `shipping.html` |
 | Return Policy | `returns.html` |
 | Terms & Conditions | `terms.html` |
@@ -44,30 +45,29 @@ In Porkbun, go to **Domain Management → ladykattluxe.shop → DNS**. Delete th
 
 Don't touch any **MX** or **TXT** records used for email. DNS changes can take up to a few hours to spread.
 
-## 3. Connect Stripe checkout (Payment Links)
+## 3. How orders reach you
 
-Each product has its own Stripe Payment Link. Until a product has one, its button reads **Inquire to order** and opens the contact form with the product already filled in.
+When a customer places an order request, it's emailed to you with a number like `LKL-260924-AB12`. The email includes:
 
-For each product in `data/products.json`:
+- their name, email, phone, and shipping address
+- the shipping method they chose
+- each item, with its quantity and price
+- the subtotal
+- a gift note and any order notes
 
-1. In the Stripe Dashboard, go to **Payment Links → New**. Add a product with the same **name and price** as the site.
-2. Under options:
-   - Turn on **Let customers adjust quantity**.
-   - Turn on **Collect customers' addresses → Shipping addresses** (United States).
-   - Add your **shipping rates**.
-   - Optionally add a **custom field** labeled "Gift note."
-3. Under **After payment**, choose *Don't show confirmation page* and redirect to `https://ladykattluxe.shop/success.html`.
-4. Copy the link (`https://buy.stripe.com/…`) into that product's `"paymentLink"` field in `data/products.json`.
+Reply within one business day with the total (subtotal + shipping + any sales tax) and a way to pay. Ship once payment arrives.
 
-For gift sets, `compareAt` is the "value" price (the individual items added together). Prices are in **cents** (`5800` = $58.00). **The price in Stripe is what customers are charged**, so keep it matching the site.
+Orders are delivered through the same **Formspree** form as the contact page (step 4). Until Formspree is connected, placing an order opens the customer's email app with the order already written, and the customer just presses Send.
 
-## 4. Connect the contact form (Formspree)
+To take card payments directly on the site later (for example PayPal checkout), the bag and checkout page are already in place, so only the final step needs to change.
+
+## 4. Connect Formspree (contact form + orders)
 
 1. Create a free account at <https://formspree.io> with contact@ladykattluxe.shop and create a new form.
 2. Copy the form ID. It's the part after `/f/` in the form's URL, for example `xyzabcde`.
 3. In `js/main.js`, set `var FORMSPREE_FORM_ID = 'xyzabcde';`.
 
-Until then, the form opens the visitor's email app with their message ready to send to contact@ladykattluxe.shop.
+Until then, both the contact form and checkout open the visitor's email app with their message ready to send to contact@ladykattluxe.shop.
 
 ## Previewing locally
 
@@ -75,4 +75,4 @@ Open `index.html` through any static server, for example `python3 -m http.server
 
 ## Policies
 
-The policy pages use the owner's documents (last updated August 1, 2026). Contact details are set to contact@ladykattluxe.shop and 904-663-2417. The Cookie Policy was updated on September 23, 2026, because the site has no accounts or shopping cart. The cookie banner matches it: essential cookies only.
+The policy pages use the owner's documents (last updated August 1, 2026). Contact details are set to contact@ladykattluxe.shop and 904-663-2417. The Cookie Policy was updated on September 23, 2026, because the site has no customer accounts. The cookie banner matches it: essential cookies only.

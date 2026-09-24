@@ -526,3 +526,5 @@ input:focus, textarea:focus, select.field:focus { outline: none; border-color: r
   .brand-name small { letter-spacing: .3em; }
   .cart-link { padding: 0 12px; gap: 6px; }
 }
+@media (min-width: 901px) { .summary-panel { position: sticky; top: calc(var(--header-h) + 16px); } }
+#checkout { scroll-margin-top: calc(var(--header-h) + 16px); }
