@@ -393,8 +393,15 @@
       '<h3 class="product-title">' + esc(p.name) + '</h3>' +
       '<p class="product-desc">' + esc(p.description) + '</p>' +
       '<div class="product-foot"><div class="price">' + money(p.price) + save + '</div>' +
-      '<button class="add-btn" type="button" data-add="' + esc(p.id) + '">Add to bag</button></div>' +
+      buyButton(p) + '</div>' +
       '</div></article>';
+  }
+
+  // Products with a Stripe Payment Link go straight to checkout; any without
+  // one fall back to the order-request bag.
+  function buyButton(p) {
+    if (p.paymentLink) return '<a class="add-btn" href="' + esc(p.paymentLink) + '" rel="noopener">Buy now</a>';
+    return '<button class="add-btn" type="button" data-add="' + esc(p.id) + '">Add to bag</button>';
   }
 
   function bindProductActions(root, data) {
@@ -424,7 +431,10 @@
       document.body.appendChild(dlg);
       dlg.addEventListener('click', function (e) { if (e.target === dlg) dlg.close(); });
     }
-    if (typeof dlg.showModal !== 'function') { Cart.add(p.id, 1); toast(esc(p.name) + ' added to your bag'); return; }
+    if (typeof dlg.showModal !== 'function') {
+      if (p.paymentLink) { location.href = p.paymentLink; return; }
+      Cart.add(p.id, 1); toast(esc(p.name) + ' added to your bag'); return;
+    }
     var includes = p.includes ? '<div class="qv-includes"><h4>Inside the set</h4><ul>' +
       p.includes.map(function (i) { return '<li>' + esc(i) + '</li>'; }).join('') + '</ul></div>' : '';
     var utm = '?utm_source=lady_katt_luxe&utm_medium=referral';
@@ -439,19 +449,23 @@
       (p.compareAt ? ' <s>' + money(p.compareAt) + '</s><span class="value-note">You save ' + money(p.compareAt - p.price) + '</span>' : '') + '</div>' +
       '<p>' + esc(p.description) + '</p>' + includes +
       (p.details ? '<ul>' + p.details.map(function (d) { return '<li>' + esc(d) + '</li>'; }).join('') + '</ul>' : '') +
-      '<div class="qv-actions">' +
+      (p.paymentLink
+        ? '<div class="qv-actions"><a class="btn" href="' + esc(p.paymentLink) + '" rel="noopener">Buy now</a></div>' +
+          '<p class="muted" style="font-size:.8rem;margin:12px 0 0">Choose your quantity and add a gift note at secure Stripe checkout.</p>'
+        : '<div class="qv-actions">' +
       '<div class="qty"><button type="button" data-step="-1" aria-label="Decrease quantity">&minus;</button>' +
       '<input type="number" min="1" max="' + MAX_QTY + '" value="1" aria-label="Quantity"><button type="button" data-step="1" aria-label="Increase quantity">+</button></div>' +
-      '<button class="btn" type="button" data-qv-add>Add to bag</button></div>' +
+      '<button class="btn" type="button" data-qv-add>Add to bag</button></div>') +
       '<p class="credit">Photo: <a href="https://unsplash.com/@' + esc(p.credit.username) + utm + '" target="_blank" rel="noopener">' + esc(p.credit.name) + '</a> on <a href="https://unsplash.com/' + utm + '" target="_blank" rel="noopener">Unsplash</a></p>' +
       '</div></div>';
+    $('.qv-close', dlg).addEventListener('click', function () { dlg.close(); });
+    if (p.paymentLink) { dlg.showModal(); return; }
     var input = $('input', dlg);
     $all('[data-step]', dlg).forEach(function (b) {
       b.addEventListener('click', function () {
         input.value = Math.max(1, Math.min(MAX_QTY, (parseInt(input.value, 10) || 1) + parseInt(b.getAttribute('data-step'), 10)));
       });
     });
-    $('.qv-close', dlg).addEventListener('click', function () { dlg.close(); });
     $('[data-qv-add]', dlg).addEventListener('click', function () {
       var q = Math.max(1, Math.min(MAX_QTY, parseInt(input.value, 10) || 1));
       Cart.add(p.id, q);
@@ -697,7 +711,11 @@
 
   function initSuccess() {
     var order = new URLSearchParams(location.search).get('order');
-    if (order && /^LKL-[\w-]{4,20}$/.test(order)) $('#order-number').textContent = order;
+    if (!order) return;
+    // Arriving from the order-request bag rather than Stripe checkout
+    $('#paid-msg').hidden = true;
+    $('#request-msg').hidden = false;
+    if (/^LKL-[\w-]{4,20}$/.test(order)) $('#order-number').textContent = order;
   }
 
   function initContact() {

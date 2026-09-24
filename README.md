@@ -2,7 +2,7 @@
 
 Storefront for **Lady Katt Luxe LLC** (Titusville, FL · Business ID 1556312).
 It's a fully static site built for **GitHub Pages**, with no server to run.
-Checkout works as an **order request**: customers fill their bag and submit their shipping details, and the order is emailed to you. You then send them a payment request (PayPal invoice, Cash App, Zelle, etc.) and ship once they've paid. No payment is taken on the site.
+Each product's **Buy now** button opens its own **Stripe Payment Link**, where the customer pays by card and enters a US shipping address and an optional gift note. Any product without a link falls back to the **order request** bag: the customer submits their shipping details, the order is emailed to you, and you send them a payment request.
 
 ## Pages
 
@@ -13,7 +13,7 @@ Checkout works as an **order request**: customers fill their bag and submit thei
 | About Us | `about.html` |
 | Contact | `contact.html` |
 | Shopping bag + checkout (order request) | `cart.html` |
-| Order request received | `success.html` |
+| Order confirmation (Stripe redirects here; also shown after an order request) | `success.html` |
 | Shipping Policy | `shipping.html` |
 | Return Policy | `returns.html` |
 | Terms & Conditions | `terms.html` |
@@ -46,6 +46,14 @@ In Porkbun, go to **Domain Management → ladykattluxe.shop → DNS**. Delete th
 Don't touch any **MX** or **TXT** records used for email. DNS changes can take up to a few hours to spread.
 
 ## 3. How orders reach you
+
+### Stripe Payment Links
+
+Each product in `data/products.json` has a `"paymentLink"` (`https://buy.stripe.com/…`) created in the Lady Katt Luxe LLC Stripe account (live mode). Every link lets the customer change the quantity, collects a US shipping address, has an optional **Gift note** field, and sends the customer to `https://ladykattluxe.shop/success.html` after they pay. Paid orders, with the shipping address and gift note, show up in the Stripe Dashboard under **Payments**.
+
+The price in Stripe is what customers are charged. If you change a price in `data/products.json`, change it in Stripe as well. Stripe prices can't be edited, so add a new price to the product and update its Payment Link. To stop selling an item online, remove its `paymentLink` value, and its button goes back to **Add to bag**.
+
+### Order requests (the bag)
 
 When a customer places an order request, it's emailed to you with a number like `LKL-260924-AB12`. The email includes:
 
