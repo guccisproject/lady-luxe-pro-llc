@@ -49,7 +49,7 @@ Don't touch any **MX** or **TXT** records used for email. DNS changes can take u
 
 ### Stripe Payment Links
 
-Each product in `data/products.json` has a `"paymentLink"` (`https://buy.stripe.com/…`) created in the Lady Katt Luxe LLC Stripe account (live mode). Every link lets the customer change the quantity, collects a US shipping address, has an optional **Gift note** field, and sends the customer to `https://ladykattluxe.shop/success.html` after they pay. Paid orders, with the shipping address and gift note, show up in the Stripe Dashboard under **Payments**.
+Each product in `data/products.json` has a `"paymentLink"` (`https://buy.stripe.com/…`) created in the Lady Katt Luxe LLC Stripe account (live mode). Every link lets the customer change the quantity, collects a US shipping address, has an optional **Gift note** field, charges shipping (free on products $75 and up, $6.95 on the rest), and sends the customer to `https://ladykattluxe.shop/success.html` after they pay. Paid orders, with the shipping address and gift note, show up in the Stripe Dashboard under **Payments**.
 
 The price in Stripe is what customers are charged. If you change a price in `data/products.json`, change it in Stripe as well. Stripe prices can't be edited, so add a new price to the product and update its Payment Link. To stop selling an item online, remove its `paymentLink` value, and its button goes back to **Add to bag**.
 
