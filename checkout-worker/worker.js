@@ -14,7 +14,7 @@
 
 // ---- Shipping (edit these to change your rates; amounts are in cents) --------
 const STANDARD_SHIPPING = 695;           // $6.95
-const FREE_SHIPPING_THRESHOLD = 7500;    // free standard shipping at $75+
+const FREE_SHIPPING_THRESHOLD = 5000;    // free standard shipping at $50+
 const EXPRESS_SHIPPING = 1495;           // $14.95
 const MAX_QTY_PER_ITEM = 10;
 // -----------------------------------------------------------------------------

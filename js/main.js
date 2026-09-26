@@ -24,7 +24,7 @@
   var CHECKOUT_API_URL = '';
 
   // Keep in sync with checkout-worker/worker.js
-  var FREE_SHIPPING_THRESHOLD = 7500;
+  var FREE_SHIPPING_THRESHOLD = 5000;
   var STANDARD_SHIPPING = 695;
 
   var NAV = [
@@ -752,30 +752,29 @@
 
   function initSuccess() {
     var params = new URLSearchParams(location.search);
-    var sessionId = params.get('session_id');
-    if (sessionId) {
-      // Paid through Stripe
-      Cart.clear();
-      $('#success-eyebrow').textContent = 'Order confirmed';
-      $('#success-lead').innerHTML = 'Your order is confirmed and a receipt is on its way to your inbox.';
-      $('#success-body').innerHTML = 'We&rsquo;ll send tracking details as soon as your order ships &mdash; usually within 1&ndash;3 business days. ' +
-        'Questions? Email <a href="mailto:' + BUSINESS.email + '" style="border-bottom:1px solid var(--line)">' + BUSINESS.email + '</a> or call <a href="tel:' + BUSINESS.phoneHref + '" style="border-bottom:1px solid var(--line)">' + BUSINESS.phone + '</a>.';
-      if (CHECKOUT_API_URL && /^cs_(test|live)_[A-Za-z0-9]+$/.test(sessionId)) {
-        fetch(CHECKOUT_API_URL.replace(/\/+$/, '') + '/session?id=' + encodeURIComponent(sessionId))
-          .then(function (r) { return r.ok ? r.json() : null; })
-          .then(function (s) {
-            if (!s) return;
-            $('#success-lead').innerHTML = (s.name ? 'Thank you, <strong>' + esc(s.name.split(' ')[0]) + '</strong>. ' : '') +
-              'Your order <strong>' + esc(s.orderNumber) + '</strong> is confirmed' +
-              (typeof s.total === 'number' ? ' (' + moneyExact(s.total) + ')' : '') + '.' +
-              (s.email ? ' A receipt is on its way to <strong>' + esc(s.email) + '</strong>.' : '');
-          })
-          .catch(function () { /* the generic message is fine */ });
-      }
+    var order = params.get('order');
+    if (order) {
+      // Arriving from the order-request bag rather than Stripe checkout
+      $('#paid-msg').hidden = true;
+      $('#request-msg').hidden = false;
+      if (/^LKL-[\w-]{4,20}$/.test(order)) $('#order-number').textContent = order;
       return;
     }
-    var order = params.get('order');
-    if (order && /^LKL-[\w-]{4,20}$/.test(order)) $('#order-number').textContent = order;
+    // Paid through Stripe
+    Cart.clear();
+    var sessionId = params.get('session_id');
+    if (CHECKOUT_API_URL && sessionId && /^cs_(test|live)_[A-Za-z0-9]+$/.test(sessionId)) {
+      fetch(CHECKOUT_API_URL.replace(/\/+$/, '') + '/session?id=' + encodeURIComponent(sessionId))
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (s) {
+          if (!s) return;
+          $('#paid-lead').innerHTML = (s.name ? 'Thank you, <strong>' + esc(s.name.split(' ')[0]) + '</strong>. ' : '') +
+            'Your order <strong>' + esc(s.orderNumber) + '</strong> is confirmed' +
+            (typeof s.total === 'number' ? ' (' + moneyExact(s.total) + ')' : '') + '.' +
+            (s.email ? ' A receipt is on its way to <strong>' + esc(s.email) + '</strong>.' : '');
+        })
+        .catch(function () { /* the generic message is fine */ });
+    }
   }
 
   function initContact() {

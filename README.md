@@ -57,7 +57,7 @@ This takes about 10 minutes and is free.
 6. **Copy the worker's address.** It looks like `https://ladykattluxe-checkout.YOURNAME.workers.dev`.
 7. **Connect the site.** In `js/main.js`, set `var CHECKOUT_API_URL = 'https://ladykattluxe-checkout.YOURNAME.workers.dev';`, then commit and push.
 
-**What customers get at checkout:** the whole bag in one payment; card, Apple Pay, and Google Pay; a U.S. shipping address; Standard shipping ($6.95, free on $75+) or Express ($14.95); an optional gift note; and promo codes if you create them in Stripe. Stripe emails the receipt, and every order appears in your Stripe Dashboard under **Payments**, including the shipping address and gift note.
+**What customers get at checkout:** the whole bag in one payment; card, Apple Pay, and Google Pay; a U.S. shipping address; Standard shipping ($6.95, free on orders $50+) or Express ($14.95); an optional gift note; and promo codes if you create them in Stripe. Stripe emails the receipt, and every order appears in your Stripe Dashboard under **Payments**, including the shipping address and gift note.
 
 **Prices:** the worker always charges the prices in `data/products.json`, so changing a price there updates checkout too. To change shipping rates, edit the numbers at the top of `checkout-worker/worker.js`, paste it into Cloudflare again, and update the matching numbers near the top of `js/main.js`.
 
