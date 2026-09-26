@@ -18,6 +18,15 @@
   var FORMSPREE_FORM_ID = '';
   var MAX_QTY = 10;
 
+  // Stripe checkout helper (the Cloudflare Worker in checkout-worker/worker.js).
+  // Paste its URL here, e.g. 'https://ladykattluxe-checkout.yourname.workers.dev'.
+  // While this is empty, the bag uses the order-request form instead.
+  var CHECKOUT_API_URL = '';
+
+  // Keep in sync with checkout-worker/worker.js
+  var FREE_SHIPPING_THRESHOLD = 7500;
+  var STANDARD_SHIPPING = 695;
+
   var NAV = [
     { href: 'index.html', label: 'Home', page: 'home' },
     { href: 'products.html', label: 'Shop', page: 'products' },
@@ -567,6 +576,7 @@
         }).join('') +
         '</section>' +
 
+        (CHECKOUT_API_URL ? '' :
         '<section class="glass glass-pad" id="checkout" aria-label="Checkout" style="margin-top:clamp(16px,2.5vw,32px)">' +
         '<h2 style="font-size:1.9rem">Checkout</h2>' +
         '<p style="font-size:.95rem">Send us your order and shipping details. We&rsquo;ll reply within one business day with your total, including shipping, and a secure way to pay. Your order ships as soon as payment is received.</p>' +
@@ -589,7 +599,7 @@
         '<div class="full"><button class="btn" type="submit">Place order request</button>' +
         '<p class="form-status" id="checkout-status" role="status" aria-live="polite"></p>' +
         '<p class="muted" style="font-size:.8rem;margin:0">No payment is taken on this site. By placing an order request you agree to our <a href="terms.html" style="border-bottom:1px solid var(--line)">Terms</a>, <a href="shipping.html" style="border-bottom:1px solid var(--line)">Shipping Policy</a>, and <a href="returns.html" style="border-bottom:1px solid var(--line)">Return Policy</a>.</p></div>' +
-        '</form></section>' +
+        '</form></section>') +
         '</div>' +
 
         '<aside class="glass glass-pad summary-panel" aria-label="Order summary">' +
@@ -598,9 +608,10 @@
           var p = data.byId[i.id];
           return '<div class="summary-row" style="font-size:.92rem"><span>' + esc(p.name) + ' &times; ' + i.qty + '</span><span>' + moneyExact(p.price * i.qty) + '</span></div>';
         }).join('') +
+        (CHECKOUT_API_URL ? stripeSummary(subtotal) :
         '<div class="summary-row total"><span>Subtotal</span><span>' + moneyExact(subtotal) + '</span></div>' +
         '<p class="muted" style="font-size:.85rem;margin:10px 0 0">Shipping and any applicable sales tax are added to your payment request.</p>' +
-        '<a class="btn btn-block" href="#checkout" style="margin-top:22px">Continue to checkout</a>' +
+        '<a class="btn btn-block" href="#checkout" style="margin-top:22px">Continue to checkout</a>') +
         '<a class="link-arrow" href="products.html" style="display:table;margin:18px auto 0">Continue shopping</a>' +
         '</aside></div>';
 
@@ -620,7 +631,51 @@
         $('[data-remove]', row).addEventListener('click', function () { Cart.remove(id); });
       });
 
-      bindCheckout($('#checkout-form', root), items, subtotal, data);
+      if (CHECKOUT_API_URL) $('#stripe-checkout', root).addEventListener('click', function () { startStripeCheckout(items); });
+      else bindCheckout($('#checkout-form', root), items, subtotal, data);
+    }
+
+    function stripeSummary(subtotal) {
+      var remaining = Math.max(0, FREE_SHIPPING_THRESHOLD - subtotal);
+      var pct = Math.min(100, Math.round((subtotal / FREE_SHIPPING_THRESHOLD) * 100));
+      return '<div class="summary-row" style="margin-top:6px"><span>Subtotal</span><span>' + moneyExact(subtotal) + '</span></div>' +
+        (remaining > 0
+          ? '<p style="font-size:.88rem;margin:6px 0 0">You&rsquo;re <strong>' + moneyExact(remaining) + '</strong> away from complimentary standard shipping.</p>'
+          : '<p style="font-size:.88rem;margin:6px 0 0">Your order qualifies for <strong>complimentary standard shipping</strong>.</p>') +
+        '<div class="progress" aria-hidden="true"><span style="width:' + pct + '%"></span></div>' +
+        '<div class="summary-row"><span>Standard shipping</span><span>' + (remaining > 0 ? moneyExact(STANDARD_SHIPPING) : 'Complimentary') + '</span></div>' +
+        '<div class="summary-row"><span>Sales tax</span><span class="muted">Calculated at checkout</span></div>' +
+        '<div class="summary-row total"><span>Estimated total</span><span>' + moneyExact(subtotal + (remaining > 0 ? STANDARD_SHIPPING : 0)) + '</span></div>' +
+        '<button class="btn btn-block" type="button" id="stripe-checkout" style="margin-top:22px">' + ICONS.lock.replace('<svg', '<svg width="14" height="14"') + ' Secure checkout</button>' +
+        '<p class="form-status" id="checkout-status" role="alert"></p>' +
+        '<div class="pay-note">' + ICONS.lock + '<span>Payments are processed securely by Stripe. We never see or store your card details.</span></div>' +
+        '<p class="muted center" style="font-size:.8rem;margin-top:14px">Express shipping and a gift note can be added at checkout. By checking out you agree to our <a href="terms.html" style="border-bottom:1px solid var(--line)">Terms</a> and <a href="returns.html" style="border-bottom:1px solid var(--line)">Return Policy</a>.</p>';
+    }
+
+    function startStripeCheckout(items) {
+      var btn = $('#stripe-checkout');
+      var status = $('#checkout-status');
+      var label = btn.innerHTML;
+      btn.disabled = true;
+      btn.textContent = 'Preparing secure checkout…';
+      status.className = 'form-status';
+      status.textContent = '';
+      fetch(CHECKOUT_API_URL.replace(/\/+$/, '') + '/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: items.map(function (i) { return { id: i.id, qty: i.qty }; }) })
+      }).then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (b) { return { ok: r.ok, body: b }; });
+      }).then(function (res) {
+        if (res.ok && res.body.url) { location.href = res.body.url; return; }
+        throw new Error(res.body.error || 'Checkout is unavailable right now.');
+      }).catch(function (err) {
+        btn.disabled = false;
+        btn.innerHTML = label;
+        status.className = 'form-status err';
+        status.innerHTML = esc(err.message === 'Failed to fetch' ? 'We couldn’t reach checkout.' : err.message) +
+          ' If this keeps happening, email us at <a href="mailto:' + BUSINESS.email + '">' + BUSINESS.email + '</a>.';
+      });
     }
 
     // Keep what the customer typed if the bag re-renders (quantity changes etc.)
@@ -696,7 +751,30 @@
   }
 
   function initSuccess() {
-    var order = new URLSearchParams(location.search).get('order');
+    var params = new URLSearchParams(location.search);
+    var sessionId = params.get('session_id');
+    if (sessionId) {
+      // Paid through Stripe
+      Cart.clear();
+      $('#success-eyebrow').textContent = 'Order confirmed';
+      $('#success-lead').innerHTML = 'Your order is confirmed and a receipt is on its way to your inbox.';
+      $('#success-body').innerHTML = 'We&rsquo;ll send tracking details as soon as your order ships &mdash; usually within 1&ndash;3 business days. ' +
+        'Questions? Email <a href="mailto:' + BUSINESS.email + '" style="border-bottom:1px solid var(--line)">' + BUSINESS.email + '</a> or call <a href="tel:' + BUSINESS.phoneHref + '" style="border-bottom:1px solid var(--line)">' + BUSINESS.phone + '</a>.';
+      if (CHECKOUT_API_URL && /^cs_(test|live)_[A-Za-z0-9]+$/.test(sessionId)) {
+        fetch(CHECKOUT_API_URL.replace(/\/+$/, '') + '/session?id=' + encodeURIComponent(sessionId))
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (s) {
+            if (!s) return;
+            $('#success-lead').innerHTML = (s.name ? 'Thank you, <strong>' + esc(s.name.split(' ')[0]) + '</strong>. ' : '') +
+              'Your order <strong>' + esc(s.orderNumber) + '</strong> is confirmed' +
+              (typeof s.total === 'number' ? ' (' + moneyExact(s.total) + ')' : '') + '.' +
+              (s.email ? ' A receipt is on its way to <strong>' + esc(s.email) + '</strong>.' : '');
+          })
+          .catch(function () { /* the generic message is fine */ });
+      }
+      return;
+    }
+    var order = params.get('order');
     if (order && /^LKL-[\w-]{4,20}$/.test(order)) $('#order-number').textContent = order;
   }
 
