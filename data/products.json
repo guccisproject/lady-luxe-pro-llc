@@ -304,6 +304,71 @@
       "credit": { "name": "Nifty Leather", "username": "niftyleather" },
       "description": "A refillable leather cover, a lined notebook, and a weighted pen — for plans, lists, and big ideas.",
       "details": ["A5 refillable notebook", "Genuine leather cover", "Includes metal ballpoint pen"]
+    },
+    {
+      "id": "crystal-satin-scrunchie",
+      "name": "Crystal Satin Scrunchie",
+      "category": "fashion",
+      "price": 500,
+      "badge": "$5 & Under",
+      "featured": false,
+      "image": "photo-1788079962361-3b0031406aae",
+      "alt": "Gold satin scrunchie set with small crystals on a white surface",
+      "credit": { "name": "Kārlis Zalāns", "username": "karliszalans" },
+      "description": "Liquid-gold satin with a scatter of crystals — gentle on hair and pretty enough to wear on your wrist.",
+      "details": ["Smooth satin helps prevent creases and breakage", "One size, holds medium to thick hair"]
+    },
+    {
+      "id": "pearl-hair-clip-pair",
+      "name": "Pearl Hair Clip Pair",
+      "category": "fashion",
+      "price": 500,
+      "badge": "$5 & Under",
+      "featured": false,
+      "image": "photo-1673710672449-81bef7305ee6",
+      "alt": "Back view of a woman wearing pearl hair clips",
+      "credit": { "name": "Valentina Schick", "username": "valentinaschick" },
+      "description": "Two faux-pearl slide clips that dress up a low bun or a tucked-back wave in seconds.",
+      "details": ["Set of 2", "Faux pearls on a gold-tone clip"]
+    },
+    {
+      "id": "mini-lip-gloss",
+      "name": "Mini Lip Gloss",
+      "category": "beauty",
+      "price": 400,
+      "badge": "$5 & Under",
+      "featured": false,
+      "image": "photo-1635263282145-253319c75fd4",
+      "alt": "A pink lip gloss beside a lipstick tube",
+      "credit": { "name": "Lilli P.", "username": "lillianette" },
+      "description": "A sheer, non-sticky shine in a soft pink — small enough for any clutch.",
+      "details": ["Travel size", "Opened cosmetics are final sale"]
+    },
+    {
+      "id": "mini-candle-trio",
+      "name": "Mini Candle Trio",
+      "category": "home",
+      "price": 500,
+      "badge": "$5 & Under",
+      "featured": false,
+      "image": "photo-1632665152039-8e19f6f79884",
+      "alt": "Three small lit candles on a table in front of a window",
+      "credit": { "name": "Sixteen Miles Out", "username": "sixteenmilesout" },
+      "description": "Three little unscented candles for a warm glow on the nightstand, the bath, or the dinner table.",
+      "details": ["Set of 3", "Unscented"]
+    },
+    {
+      "id": "blush-greeting-card",
+      "name": "Blush Greeting Card",
+      "category": "lifestyle",
+      "price": 300,
+      "badge": "$5 & Under",
+      "featured": false,
+      "image": "photo-1567794947078-3b0d66d77224",
+      "alt": "A stack of pink envelopes",
+      "credit": { "name": "Diana Light", "username": "dreamcatchlight" },
+      "description": "A blank card in a blush envelope — add it to any order and write the message yourself.",
+      "details": ["Blank inside", "Includes envelope"]
     }
   ]
 }
