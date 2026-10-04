@@ -23,14 +23,27 @@
   // While this is empty, the bag uses the order-request form instead.
   var CHECKOUT_API_URL = '';
 
-  // Keep in sync with checkout-worker/worker.js
-  var FREE_SHIPPING_THRESHOLD = 5000;
-  var STANDARD_SHIPPING = 695;
+  // Keep in sync with checkout-worker/worker.js. Standard shipping goes by
+  // order subtotal; orders past the last tier ship free.
+  var STANDARD_SHIPPING_TIERS = [
+    { below: 1000, amount: 395 },   // under $10: $3.95
+    { below: 2500, amount: 495 },   // $10 – $24.99: $4.95
+    { below: 5000, amount: 695 }    // $25 – $49.99: $6.95
+  ];
+  var FREE_SHIPPING_THRESHOLD = STANDARD_SHIPPING_TIERS[STANDARD_SHIPPING_TIERS.length - 1].below;
+
+  function standardShippingFor(subtotal) {
+    for (var i = 0; i < STANDARD_SHIPPING_TIERS.length; i++) {
+      if (subtotal < STANDARD_SHIPPING_TIERS[i].below) return STANDARD_SHIPPING_TIERS[i].amount;
+    }
+    return 0;
+  }
 
   var NAV = [
     { href: 'index.html', label: 'Home', page: 'home' },
     { href: 'products.html', label: 'Shop', page: 'products' },
     { href: 'products.html?category=gift-sets', label: 'Gift Sets', page: 'gift-sets' },
+    { href: 'products.html?category=dollar-bin', label: 'Dollar Bin', page: 'dollar-bin' },
     { href: 'about.html', label: 'About', page: 'about' },
     { href: 'contact.html', label: 'Contact', page: 'contact' }
   ];
@@ -181,7 +194,8 @@
   function renderHeader() {
     var page = document.body.getAttribute('data-page');
     var params = new URLSearchParams(location.search);
-    var current = page === 'products' && params.get('category') === 'gift-sets' ? 'gift-sets' : page;
+    var cat = params.get('category');
+    var current = page === 'products' && (cat === 'gift-sets' || cat === 'dollar-bin') ? cat : page;
     var header = document.createElement('header');
     header.className = 'site-header';
     header.innerHTML =
@@ -637,15 +651,16 @@
 
     function stripeSummary(subtotal) {
       var remaining = Math.max(0, FREE_SHIPPING_THRESHOLD - subtotal);
+      var shipping = standardShippingFor(subtotal);
       var pct = Math.min(100, Math.round((subtotal / FREE_SHIPPING_THRESHOLD) * 100));
       return '<div class="summary-row" style="margin-top:6px"><span>Subtotal</span><span>' + moneyExact(subtotal) + '</span></div>' +
         (remaining > 0
           ? '<p style="font-size:.88rem;margin:6px 0 0">You&rsquo;re <strong>' + moneyExact(remaining) + '</strong> away from complimentary standard shipping.</p>'
           : '<p style="font-size:.88rem;margin:6px 0 0">Your order qualifies for <strong>complimentary standard shipping</strong>.</p>') +
         '<div class="progress" aria-hidden="true"><span style="width:' + pct + '%"></span></div>' +
-        '<div class="summary-row"><span>Standard shipping</span><span>' + (remaining > 0 ? moneyExact(STANDARD_SHIPPING) : 'Complimentary') + '</span></div>' +
+        '<div class="summary-row"><span>Standard shipping</span><span>' + (shipping ? moneyExact(shipping) : 'Complimentary') + '</span></div>' +
         '<div class="summary-row"><span>Sales tax</span><span class="muted">Calculated at checkout</span></div>' +
-        '<div class="summary-row total"><span>Estimated total</span><span>' + moneyExact(subtotal + (remaining > 0 ? STANDARD_SHIPPING : 0)) + '</span></div>' +
+        '<div class="summary-row total"><span>Estimated total</span><span>' + moneyExact(subtotal + shipping) + '</span></div>' +
         '<button class="btn btn-block" type="button" id="stripe-checkout" style="margin-top:22px">' + ICONS.lock.replace('<svg', '<svg width="14" height="14"') + ' Secure checkout</button>' +
         '<p class="form-status" id="checkout-status" role="alert"></p>' +
         '<div class="pay-note">' + ICONS.lock + '<span>Payments are processed securely by Stripe. We never see or store your card details.</span></div>' +

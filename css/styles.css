@@ -188,7 +188,7 @@ strong { font-weight: 500; color: var(--text); }
 .nav { display: flex; align-items: center; gap: clamp(18px, 2.4vw, 34px); }
 .nav a {
   font-size: .74rem; letter-spacing: .24em; text-transform: uppercase; color: var(--text-soft);
-  position: relative; padding: 6px 0; transition: color .3s;
+  position: relative; padding: 6px 0; transition: color .3s; white-space: nowrap;
 }
 .nav a::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: var(--white); transform: scaleX(0); transform-origin: left; transition: transform .4s var(--ease); }
 .nav a:hover, .nav a[aria-current="page"] { color: var(--white); }
@@ -220,7 +220,7 @@ strong { font-weight: 500; color: var(--text); }
 .menu-open .menu-toggle span::before { transform: translateY(6px) rotate(45deg); }
 .menu-open .menu-toggle span::after { transform: translateY(-6px) rotate(-45deg); }
 
-@media (max-width: 900px) {
+@media (max-width: 1000px) {
   .menu-toggle { display: inline-flex; }
   .cart-link .cart-label { display: none; }
   .nav {

@@ -13,8 +13,13 @@
  */
 
 // ---- Shipping (edit these to change your rates; amounts are in cents) --------
-const STANDARD_SHIPPING = 695;           // $6.95
-const FREE_SHIPPING_THRESHOLD = 5000;    // free standard shipping at $50+
+// Standard shipping goes by order subtotal: the first tier the subtotal is
+// below sets the price. Orders past the last tier ship free.
+const STANDARD_SHIPPING_TIERS = [
+  { below: 1000, amount: 395 },          // under $10: $3.95
+  { below: 2500, amount: 495 },          // $10 – $24.99: $4.95
+  { below: 5000, amount: 695 },          // $25 – $49.99: $6.95
+];                                       // $50 and up: free
 const EXPRESS_SHIPPING = 1495;           // $14.95
 const MAX_QTY_PER_ITEM = 10;
 // -----------------------------------------------------------------------------
@@ -96,9 +101,9 @@ async function createCheckout(request, env, siteUrl, cors) {
   }
   if (!params.line_items.length) return json({ error: 'Your bag is empty.' }, 400, cors);
 
-  const free = subtotal >= FREE_SHIPPING_THRESHOLD;
+  const standard = standardShippingFor(subtotal);
   params.shipping_options = [
-    shippingOption(free ? 'Complimentary Standard Shipping' : 'Standard Shipping', free ? 0 : STANDARD_SHIPPING, 3, 10),
+    shippingOption(standard ? 'Standard Shipping' : 'Complimentary Standard Shipping', standard, 3, 10),
     shippingOption('Express Shipping', EXPRESS_SHIPPING, 2, 3),
   ];
 
@@ -125,6 +130,11 @@ async function getSession(url, env, cors) {
 }
 
 // ---- helpers -----------------------------------------------------------------
+
+function standardShippingFor(subtotal) {
+  const tier = STANDARD_SHIPPING_TIERS.find((t) => subtotal < t.below);
+  return tier ? tier.amount : 0;
+}
 
 function shippingOption(name, amount, minDays, maxDays) {
   return {

@@ -6,7 +6,8 @@
     { "id": "beauty", "name": "Beauty" },
     { "id": "fashion", "name": "Fashion" },
     { "id": "home", "name": "Home" },
-    { "id": "lifestyle", "name": "Lifestyle" }
+    { "id": "lifestyle", "name": "Lifestyle" },
+    { "id": "dollar-bin", "name": "Dollar Bin" }
   ],
   "products": [
     {
@@ -369,6 +370,54 @@
       "credit": { "name": "Diana Light", "username": "dreamcatchlight" },
       "description": "A blank card in a blush envelope — add it to any order and write the message yourself.",
       "details": ["Blank inside", "Includes envelope"]
+    },
+    {
+      "id": "hair-tie-trio",
+      "name": "Hair Tie Trio",
+      "category": "dollar-bin",
+      "price": 100,
+      "featured": false,
+      "image": "photo-1613323885593-5fbcf35bf8ba",
+      "alt": "Woman with her hair pulled back in a simple tie",
+      "credit": { "name": "K8", "username": "_k8_" },
+      "description": "Three soft, snag-free hair ties for the bag, the desk, and the nightstand.",
+      "details": ["Set of 3", "No metal clasp"]
+    },
+    {
+      "id": "mini-nail-file",
+      "name": "Mini Nail File",
+      "category": "dollar-bin",
+      "price": 100,
+      "featured": false,
+      "image": "photo-1700760933910-d3c03aa18b65",
+      "alt": "Close-up of a manicure with a nail file",
+      "credit": { "name": "Farhad Ibrahimzade", "username": "ferhadd" },
+      "description": "A slim double-sided file that tucks into any wallet for on-the-go touch-ups.",
+      "details": ["Double-sided grit", "Wallet size"]
+    },
+    {
+      "id": "kraft-gift-tag",
+      "name": "Kraft Gift Tag",
+      "category": "dollar-bin",
+      "price": 100,
+      "featured": false,
+      "image": "photo-1573853019548-c38efdbc2f09",
+      "alt": "Presents wrapped in brown paper and twine with a gift tag",
+      "credit": { "name": "Erica Marsland Huynh", "username": "partyintheshire" },
+      "description": "A kraft paper tag with twine — the finishing touch for any gift.",
+      "details": ["Includes twine", "Blank to write your own message"]
+    },
+    {
+      "id": "single-tealight",
+      "name": "Single Tealight",
+      "category": "dollar-bin",
+      "price": 100,
+      "featured": false,
+      "image": "photo-1508093989287-061d64de7324",
+      "alt": "A single lit tealight candle",
+      "credit": { "name": "Joanna Kosinska", "username": "joannakosinska" },
+      "description": "One unscented tealight for a little glow wherever you need it.",
+      "details": ["Unscented", "Burns about 4 hours"]
     }
   ]
 }
